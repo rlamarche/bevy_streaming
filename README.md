@@ -155,6 +155,7 @@ _Note 2: in the example, the cursor is volontary shown so you can easily have an
 
 This plugin would not have been possible without the following libraries:
 
-- Bevy Engine (of couse)
+- Bevy Engine (of course)
 - Bevy Capture Plugin (https://crates.io/crates/bevy_capture) for headless capturing of frames to Gstreamer
 - GStreamer (https://gstreamer.freedesktop.org/) and Rust Bindings
+- Unreal Engine for their Pixel Streaming Infrastructure (https://github.com/EpicGamesExt/PixelStreamingInfrastructure)
