@@ -1,10 +1,12 @@
+#![allow(dead_code)]
+
 use std::io::{Cursor, Read};
 
 use anyhow::anyhow;
 use byteorder::{LittleEndian, ReadBytesExt};
 
 #[derive(Clone, Debug)]
-pub enum UeMessage {
+pub enum PSMessage {
     UiInteraction(UiInteraction),
     Command(Command),
     KeyDown(KeyDown),
@@ -19,7 +21,7 @@ pub enum UeMessage {
     MouseDouble(MouseDouble),
 }
 
-impl TryFrom<&[u8]> for UeMessage {
+impl TryFrom<&[u8]> for PSMessage {
     type Error = anyhow::Error;
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         let Some(id) = value.get(0) else {
@@ -29,18 +31,18 @@ impl TryFrom<&[u8]> for UeMessage {
             return Err(anyhow!("No data in buffer for decoding UeMessage"));
         };
         match id {
-            50 => Ok(UeMessage::UiInteraction(UiInteraction::try_from(data)?)),
-            51 => Ok(UeMessage::Command(Command::try_from(data)?)),
-            60 => Ok(UeMessage::KeyDown(KeyDown::try_from(data)?)),
-            61 => Ok(UeMessage::KeyUp(KeyUp::try_from(data)?)),
-            62 => Ok(UeMessage::KeyPress(KeyPress::try_from(data)?)),
-            70 => Ok(UeMessage::MouseEnter),
-            71 => Ok(UeMessage::MouseLeave),
-            72 => Ok(UeMessage::MouseDown(MouseDown::try_from(data)?)),
-            73 => Ok(UeMessage::MouseUp(MouseUp::try_from(data)?)),
-            74 => Ok(UeMessage::MouseMove(MouseMove::try_from(data)?)),
-            75 => Ok(UeMessage::MouseWheel(MouseWheel::try_from(data)?)),
-            76 => Ok(UeMessage::MouseDouble(MouseDouble::try_from(data)?)),
+            50 => Ok(PSMessage::UiInteraction(UiInteraction::try_from(data)?)),
+            51 => Ok(PSMessage::Command(Command::try_from(data)?)),
+            60 => Ok(PSMessage::KeyDown(KeyDown::try_from(data)?)),
+            61 => Ok(PSMessage::KeyUp(KeyUp::try_from(data)?)),
+            62 => Ok(PSMessage::KeyPress(KeyPress::try_from(data)?)),
+            70 => Ok(PSMessage::MouseEnter),
+            71 => Ok(PSMessage::MouseLeave),
+            72 => Ok(PSMessage::MouseDown(MouseDown::try_from(data)?)),
+            73 => Ok(PSMessage::MouseUp(MouseUp::try_from(data)?)),
+            74 => Ok(PSMessage::MouseMove(MouseMove::try_from(data)?)),
+            75 => Ok(PSMessage::MouseWheel(MouseWheel::try_from(data)?)),
+            76 => Ok(PSMessage::MouseDouble(MouseDouble::try_from(data)?)),
             _ => Err(anyhow!("Not supported message type {}", id)),
         }
     }

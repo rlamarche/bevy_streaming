@@ -13,11 +13,11 @@ use bevy_render::prelude::*;
 pub const SCALE: f32 = 65536.0;
 
 #[derive(SystemParam)]
-pub struct PixelStreamingConversions<'w> {
+pub struct PSConversions<'w> {
     images: Res<'w, Assets<Image>>,
 }
 
-impl<'w> PixelStreamingConversions<'w> {
+impl<'w> PSConversions<'w> {
     pub fn from_ps_position<T>(&self, camera: &Camera, x: T, y: T) -> Vec2
     where
         T: Into<f32>,
@@ -42,6 +42,7 @@ impl<'w> PixelStreamingConversions<'w> {
         self.from_ps_position(camera, x, y)
     }
 
+    #[allow(dead_code)]
     pub fn ps_to_location(
         &self,
         camera: &Camera,
@@ -55,6 +56,7 @@ impl<'w> PixelStreamingConversions<'w> {
         }
     }
 
+    #[allow(dead_code)]
     pub fn ps_to_pointer_button(&self, button: u8) -> PointerButton {
         match button {
             0 => PointerButton::Primary,

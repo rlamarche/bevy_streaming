@@ -4,7 +4,6 @@ use bevy_input::{
     keyboard::KeyboardInput,
     mouse::{MouseButtonInput, MouseMotion, MouseWheel},
 };
-use bevy_log::prelude::*;
 use bevy_picking::PickSet;
 use bevy_render::prelude::*;
 use bevy_window::{PrimaryWindow, WindowEvent, prelude::*};
@@ -15,8 +14,8 @@ mod helper;
 mod settings;
 
 pub mod gst_webrtc_encoder;
-#[cfg(feature = "ue_pixelstreaming")]
-mod ue_pixelstreaming;
+#[cfg(feature = "pixelstreaming")]
+mod pixelstreaming;
 
 #[derive(Component)]
 struct Encoder(GstWebRtcEncoder);
@@ -24,18 +23,18 @@ struct Encoder(GstWebRtcEncoder);
 #[derive(Component)]
 enum ControllerState {
     None,
-    #[cfg(feature = "ue_pixelstreaming")]
-    UeControllerState(UeControllerState),
+    #[cfg(feature = "pixelstreaming")]
+    PSControllerState(PSControllerState),
 }
 
 pub use helper::*;
 pub use settings::*;
 
-#[cfg(feature = "ue_pixelstreaming")]
-use ue_pixelstreaming::{
-    controller::UeControllerState,
-    message::UeMessage,
-    utils::{PSKeyCode, PixelStreamingConversions},
+#[cfg(feature = "pixelstreaming")]
+use pixelstreaming::{
+    controller::PSControllerState,
+    message::PSMessage,
+    utils::{PSConversions, PSKeyCode},
 };
 
 pub struct StreamerPlugin;
@@ -73,14 +72,14 @@ fn start_capturing(mut streamers: Query<(&mut bevy_capture::Capture, &Encoder)>)
 }
 
 /// This system process added and removed message handlers and update controller state
-/// And it process messages from UE
+/// And it process messages from Pixel Streaming
 fn handle_controllers(mut controllers: Query<&mut ControllerState>) {
     for mut controller in controllers.iter_mut() {
         let controller = controller.as_mut();
         match controller {
             ControllerState::None => {}
-            #[cfg(feature = "ue_pixelstreaming")]
-            ControllerState::UeControllerState(ue_controller_state) => {
+            #[cfg(feature = "pixelstreaming")]
+            ControllerState::PSControllerState(ue_controller_state) => {
                 for (peer_id, handler) in ue_controller_state.add_remove_handlers.try_iter() {
                     // add / remove handlers
                     match handler {
@@ -97,7 +96,7 @@ fn handle_controllers(mut controllers: Query<&mut ControllerState>) {
 fn handle_controller_messages(
     mut controllers: Query<(&Camera, &mut ControllerState)>,
     windows: Query<(Entity, &Window), With<PrimaryWindow>>,
-    #[cfg(feature = "ue_pixelstreaming")] ps_conversions: PixelStreamingConversions,
+    #[cfg(feature = "pixelstreaming")] ps_conversions: PSConversions,
     mut mouse_motion_event: EventWriter<MouseMotion>,
     mut mouse_button_input_events: EventWriter<MouseButtonInput>,
     mut mouse_wheel_events: EventWriter<MouseWheel>,
@@ -110,12 +109,12 @@ fn handle_controller_messages(
         let controller = controller.as_mut();
         match controller {
             ControllerState::None => {}
-            #[cfg(feature = "ue_pixelstreaming")]
-            ControllerState::UeControllerState(ue_controller_state) => {
+            #[cfg(feature = "pixelstreaming")]
+            ControllerState::PSControllerState(ue_controller_state) => {
                 for (_peer_id, handler) in ue_controller_state.handlers.iter() {
                     for ue_msg in handler.message_receiver.try_iter() {
                         match ue_msg {
-                            UeMessage::MouseMove(mouse_move) => {
+                            PSMessage::MouseMove(mouse_move) => {
                                 mouse_motion_event.send(MouseMotion {
                                     delta: ps_conversions.from_ps_delta(
                                         camera,
@@ -137,28 +136,23 @@ fn handle_controller_messages(
                                     )),
                                 }));
                             }
-                            UeMessage::MouseDown(mouse_down) => {
+                            PSMessage::MouseDown(mouse_down) => {
                                 mouse_button_input_events.send(MouseButtonInput {
                                     button: ps_conversions.ps_to_mouse_button(mouse_down.button),
                                     state: bevy_input::ButtonState::Pressed,
                                     window,
                                 });
                             }
-                            UeMessage::MouseUp(mouse_up) => {
+                            PSMessage::MouseUp(mouse_up) => {
                                 mouse_button_input_events.send(MouseButtonInput {
                                     button: ps_conversions.ps_to_mouse_button(mouse_up.button),
                                     state: bevy_input::ButtonState::Released,
                                     window,
                                 });
                             }
-                            UeMessage::UiInteraction(ui_interaction) => {
-                                info!("Received UiInteraction message: {:#?}", ui_interaction);
-                            }
-                            UeMessage::Command(command) => {
-                                info!("Received Command message: {:#?}", command);
-                            }
-                            UeMessage::KeyDown(key_down) => {
-                                info!("KeyDown {}", key_down.key_code);
+                            PSMessage::UiInteraction(_ui_interaction) => {}
+                            PSMessage::Command(_command) => {}
+                            PSMessage::KeyDown(key_down) => {
                                 keyboard_input_events.send(KeyboardInput {
                                     key_code: PSKeyCode(key_down.key_code).into(),
                                     logical_key: PSKeyCode(key_down.key_code).into(),
@@ -167,8 +161,7 @@ fn handle_controller_messages(
                                     window,
                                 });
                             }
-                            UeMessage::KeyUp(key_up) => {
-                                info!("KeyUp {}", key_up.key_code);
+                            PSMessage::KeyUp(key_up) => {
                                 keyboard_input_events.send(KeyboardInput {
                                     key_code: PSKeyCode(key_up.key_code).into(),
                                     logical_key: PSKeyCode(key_up.key_code).into(),
@@ -177,13 +170,10 @@ fn handle_controller_messages(
                                     window,
                                 });
                             }
-                            UeMessage::KeyPress(key_press) => {
-                                info!("KeyPress {}", key_press.char_code);
-                            }
-                            UeMessage::MouseEnter => {}
-                            UeMessage::MouseLeave => {}
-                            UeMessage::MouseWheel(mouse_wheel) => {
-                                info!("MouseWheel {:#?}", mouse_wheel);
+                            PSMessage::KeyPress(_key_press) => {}
+                            PSMessage::MouseEnter => {}
+                            PSMessage::MouseLeave => {}
+                            PSMessage::MouseWheel(mouse_wheel) => {
                                 mouse_wheel_events.send(MouseWheel {
                                     unit: bevy_input::mouse::MouseScrollUnit::Pixel,
                                     x: 0_f32,
@@ -191,7 +181,7 @@ fn handle_controller_messages(
                                     window,
                                 });
                             }
-                            UeMessage::MouseDouble(_mouse_double) => {}
+                            PSMessage::MouseDouble(_mouse_double) => {}
                         }
                     }
                 }

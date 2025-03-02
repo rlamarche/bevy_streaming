@@ -10,8 +10,8 @@ use gstrswebrtc::webrtcsink;
 
 use crate::{ControllerState, Encoder, StreamerSettings, gst_webrtc_encoder::GstWebRtcEncoder};
 
-#[cfg(feature = "ue_pixelstreaming")]
-use crate::ue_pixelstreaming::{controller::UeControllerState, handler::UeMessageHandler};
+#[cfg(feature = "pixelstreaming")]
+use crate::pixelstreaming::{controller::PSControllerState, handler::PSMessageHandler};
 
 #[derive(SystemParam)]
 pub struct StreamerHelper<'w> {
@@ -26,60 +26,21 @@ impl<'w> StreamerHelper<'w> {
         let encoder = GstWebRtcEncoder::with_settings(settings.clone())
             .expect("Unable to create gst encoder");
 
-        let controller_state = match settings.signalling_server {
-            crate::SignallingServer::GstWebRtc { uri: _, peer_id: _ } => {
-                // TODO bind navigation events
-                ControllerState::None
+        // Bind controller if enabled
+        let controller_state = if settings.enable_controller {
+            match settings.signalling_server {
+                crate::SignallingServer::GstWebRtc { .. } => {
+                    // TODO bind navigation events
+                    ControllerState::None
+                }
+
+                #[cfg(feature = "pixelstreaming")]
+                crate::SignallingServer::PixelStreaming { .. } => {
+                    create_pixelstreaming_controller(&encoder)
+                }
             }
-
-            #[cfg(feature = "ue_pixelstreaming")]
-            crate::SignallingServer::UePixelStreaming {
-                uri: _,
-                streamer_id: _,
-            } => {
-                let (sender, receiver) =
-                    crossbeam_channel::unbounded::<(String, Option<UeMessageHandler>)>();
-
-                encoder
-                    .webrtcsink
-                    .connect_closure("consumer-added", false, {
-                        let sender = sender.clone();
-                        glib::closure!(
-                            move |sink: &webrtcsink::BaseWebRTCSink,
-                                  peer_id: &str,
-                                  webrtcbin: &gst::Element| {
-                                info!("New consumer: {}", peer_id);
-
-                                let message_handler =
-                                    UeMessageHandler::new(sink, webrtcbin, peer_id);
-
-                                sender
-                                    .send((peer_id.to_string(), Some(message_handler)))
-                                    .unwrap();
-                            }
-                        )
-                    });
-
-                encoder
-                    .webrtcsink
-                    .connect_closure("consumer-removed", false, {
-                        let sender = sender.clone();
-                        glib::closure!(
-                            move |_sink: &webrtcsink::BaseWebRTCSink,
-                                  peer_id: &str,
-                                  _webrtcbin: &gst::Element| {
-                                info!("Consumer removed: {}", peer_id);
-
-                                sender.send((peer_id.to_string(), None)).unwrap();
-                            }
-                        )
-                    });
-
-                ControllerState::UeControllerState(UeControllerState {
-                    add_remove_handlers: receiver,
-                    handlers: HashMap::new(),
-                })
-            }
+        } else {
+            ControllerState::None
         };
 
         (
@@ -89,4 +50,44 @@ impl<'w> StreamerHelper<'w> {
             controller_state,
         )
     }
+}
+
+#[cfg(feature = "pixelstreaming")]
+fn create_pixelstreaming_controller(encoder: &GstWebRtcEncoder) -> ControllerState {
+    let (sender, receiver) = crossbeam_channel::unbounded::<(String, Option<PSMessageHandler>)>();
+
+    encoder
+        .webrtcsink
+        .connect_closure("consumer-added", false, {
+            let sender = sender.clone();
+            glib::closure!(move |sink: &webrtcsink::BaseWebRTCSink,
+                                 peer_id: &str,
+                                 webrtcbin: &gst::Element| {
+                info!("New consumer: {}", peer_id);
+
+                let message_handler = PSMessageHandler::new(sink, webrtcbin, peer_id);
+
+                sender
+                    .send((peer_id.to_string(), Some(message_handler)))
+                    .unwrap();
+            })
+        });
+
+    encoder
+        .webrtcsink
+        .connect_closure("consumer-removed", false, {
+            let sender = sender.clone();
+            glib::closure!(move |_sink: &webrtcsink::BaseWebRTCSink,
+                                 peer_id: &str,
+                                 _webrtcbin: &gst::Element| {
+                info!("Consumer removed: {}", peer_id);
+
+                sender.send((peer_id.to_string(), None)).unwrap();
+            })
+        });
+
+    ControllerState::PSControllerState(PSControllerState {
+        add_remove_handlers: receiver,
+        handlers: HashMap::new(),
+    })
 }

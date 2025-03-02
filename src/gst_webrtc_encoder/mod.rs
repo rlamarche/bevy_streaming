@@ -9,8 +9,8 @@ use gstrswebrtc::{
     webrtcsink::{self, BaseWebRTCSink, WebRTCSinkCongestionControl},
 };
 
-#[cfg(feature = "ue_pixelstreaming")]
-use crate::ue_pixelstreaming::signaller::UePsSignaller;
+#[cfg(feature = "pixelstreaming")]
+use crate::pixelstreaming::signaller::UePsSignaller;
 use crate::{CongestionControl, SignallingServer, StreamerSettings};
 
 #[derive(Debug, Display, Error)]
@@ -32,8 +32,8 @@ impl Into<Signallable> for &SignallingServer {
                 }
                 signaller.upcast()
             }
-            #[cfg(feature = "ue_pixelstreaming")]
-            SignallingServer::UePixelStreaming { uri, streamer_id } => {
+            #[cfg(feature = "pixelstreaming")]
+            SignallingServer::PixelStreaming { uri, streamer_id } => {
                 let signaller = UePsSignaller::default();
                 signaller.set_property_from_str("uri", uri);
                 if let Some(streamer_id) = streamer_id {
@@ -80,6 +80,8 @@ impl GstWebRtcEncoder {
             .format(gst::Format::Time)
             .build();
 
+        let queue = gst::ElementFactory::make("queue").build()?;
+
         let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
 
         let webrtcsink =
@@ -101,8 +103,18 @@ impl GstWebRtcEncoder {
             );
         }
 
-        pipeline.add_many([appsrc.upcast_ref(), &videoconvert, webrtcsink.upcast_ref()])?;
-        gst::Element::link_many([appsrc.upcast_ref(), &videoconvert, webrtcsink.upcast_ref()])?;
+        pipeline.add_many([
+            appsrc.upcast_ref(),
+            &queue,
+            &videoconvert,
+            webrtcsink.upcast_ref(),
+        ])?;
+        gst::Element::link_many([
+            appsrc.upcast_ref(),
+            &queue,
+            &videoconvert,
+            webrtcsink.upcast_ref(),
+        ])?;
 
         Ok(Self {
             settings,

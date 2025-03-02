@@ -4,8 +4,8 @@ pub enum SignallingServer {
         uri: String,
         peer_id: Option<String>,
     },
-    #[cfg(feature = "ue_pixelstreaming")]
-    UePixelStreaming {
+    #[cfg(feature = "pixelstreaming")]
+    PixelStreaming {
         uri: String,
         streamer_id: Option<String>,
     },
@@ -32,4 +32,6 @@ pub struct StreamerSettings {
     pub height: u32,
     pub video_caps: Option<String>,
     pub congestion_control: Option<CongestionControl>,
+    /// Enables converting controller events to mouse/keyboard events
+    pub enable_controller: bool,
 }

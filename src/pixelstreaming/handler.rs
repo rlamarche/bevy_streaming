@@ -4,17 +4,17 @@ use gst::glib::prelude::*;
 use gst_webrtc::WebRTCDataChannel;
 use gstrswebrtc::webrtcsink::BaseWebRTCSink;
 
-use super::message::UeMessage;
+use super::message::PSMessage;
 
 #[allow(dead_code)]
 #[derive(Debug)]
-pub struct UeMessageHandler {
+pub struct PSMessageHandler {
     signal_handler_id: glib::SignalHandlerId,
     data_channel: WebRTCDataChannel,
-    pub message_receiver: Receiver<UeMessage>,
+    pub message_receiver: Receiver<PSMessage>,
 }
 
-impl UeMessageHandler {
+impl PSMessageHandler {
     pub fn new(element: &BaseWebRTCSink, webrtcbin: &gst::Element, session_id: &str) -> Self {
         info!("Creating Pixel Streaming data channel");
         let channel = webrtcbin.emit_by_name::<WebRTCDataChannel>(
@@ -29,7 +29,7 @@ impl UeMessageHandler {
 
         let session_id = session_id.to_string();
 
-        let (sender, receiver) = crossbeam_channel::unbounded::<UeMessage>();
+        let (sender, receiver) = crossbeam_channel::unbounded::<PSMessage>();
 
         #[allow(unused)]
         Self {
@@ -41,7 +41,7 @@ impl UeMessageHandler {
                     #[strong]
                     session_id,
                     move |_channel: &WebRTCDataChannel, data: &glib::Bytes| {
-                        match UeMessage::try_from(data.get(..).unwrap()) {
+                        match PSMessage::try_from(data.get(..).unwrap()) {
                             Ok(message) => {
                                 sender.send(message).unwrap();
                             }
