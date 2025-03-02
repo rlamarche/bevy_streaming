@@ -125,7 +125,6 @@ Explanation of the parameters:
 - `--gpus all` : enables access to all available GPUs.
 - `-e NVIDIA_VISIBLE_DEVICES=all` : sets the environment variable to make all GPUs visible to the container.
 - `-e NVIDIA_DRIVER_CAPABILITIES=all` : sets the environment variable to enable all driver capabilities (see https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.10.0/user-guide.html#driver-capabilities).
-- `-v $(pwd)/assets:/app/assets` : mounts the local `assets` directory into the container's `/app/assets` directory for the cursor icon to be available.
 
 ### Connect to the streamer
 
