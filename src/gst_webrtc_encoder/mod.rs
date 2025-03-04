@@ -68,7 +68,6 @@ impl GstWebRtcEncoder {
             settings.width,
             settings.height,
         )
-        .fps(gst::Fraction::new(60, 1))
         .build()
         .expect("Failed to create video info");
 
@@ -77,10 +76,10 @@ impl GstWebRtcEncoder {
             .do_timestamp(true)
             .is_live(true)
             .caps(&video_info.to_caps().unwrap())
-            .format(gst::Format::Time)
+            .format(gst::Format::Bytes)
+            // Allocate space for 1 buffer
+            .max_bytes((settings.width * settings.height * 4).into())
             .build();
-
-        let queue = gst::ElementFactory::make("queue").build()?;
 
         let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
 
@@ -105,13 +104,11 @@ impl GstWebRtcEncoder {
 
         pipeline.add_many([
             appsrc.upcast_ref(),
-            &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
         gst::Element::link_many([
             appsrc.upcast_ref(),
-            &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
@@ -170,14 +167,10 @@ impl Encoder for GstWebRtcEncoder {
         if !self.started {
             self.start()?;
         }
-        // let image = image.clone().try_into_dynamic()?;
-        // let img_buffer = image.to_rgb8();
-        // let mut buffer = gst::Buffer::with_size(img_buffer.len()).unwrap();
 
         let mut buffer = gst::Buffer::with_size(image.data.len()).unwrap();
         {
             let buffer = buffer.get_mut().unwrap();
-            // buffer.copy_from_slice(0, &img_buffer).unwrap();
             buffer.copy_from_slice(0, &image.data).unwrap();
         }
 
