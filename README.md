@@ -90,7 +90,7 @@ docker build . -f docker/Dockerfile -t bevy_streaming
 
 ### Run the Docker image
 
-#### Without GPU (not recommended)
+#### Without GPU (not recommended)
 
 To run the docker image without GPU, run the following command:
 
