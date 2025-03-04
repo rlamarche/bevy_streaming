@@ -74,7 +74,7 @@ Launch the example:
 cargo run --example simple
 ```
 
-### Run the example with a headless Docker image with or without GPU acceleration
+### Build the headless Docker image
 
 I've provided a Dockerfile in `docker/Dockerfile` that runs the example as a starting point for you to build your own Docker images.
 
@@ -88,6 +88,10 @@ To build the example docker image, run the following command:
 docker build . -f docker/Dockerfile -t bevy_streaming
 ```
 
+### Run the Docker image
+
+#### Without GPU (not recommended)
+
 To run the docker image without GPU, run the following command:
 
 ```bash
@@ -98,6 +102,8 @@ docker run --rm \
 ```
 
 _Note: you can ignore the messages `ERROR wgpu_hal::gles:` see https://github.com/bevyengine/bevy/issues/13115._
+
+#### With NVIDIA GPU acceleration (recommended if you have a NVIDIA GPU)
 
 To run the docker image with NVIDIA GPU acceleration, after having installed NVIDIA Container Toolkit (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html), run the following command:
 
@@ -125,6 +131,29 @@ Explanation of the parameters:
 - `--gpus all` : enables access to all available GPUs.
 - `-e NVIDIA_VISIBLE_DEVICES=all` : sets the environment variable to make all GPUs visible to the container.
 - `-e NVIDIA_DRIVER_CAPABILITIES=all` : sets the environment variable to enable all driver capabilities (see https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/1.10.0/user-guide.html#driver-capabilities).
+
+#### With DRI GPU acceleration (recommended if you have an intel GPU)
+
+```bash
+docker run --rm \
+    -t -i \
+    --network=host \
+    --device /dev/dri:/dev/dri \
+    bevy_streaming
+```
+
+_Note: it is possible that the `vaapih264enc` encoder does not support CBR bitrate. There is a workaround that will be soon provided. If you're in this situation, you can change the encoder priority with this command:_
+
+```bash
+docker run --rm \
+    -t -i \
+    --network=host \
+    --device /dev/dri:/dev/dri \
+    -e GST_PLUGIN_FEATURE_RANK="x264enc:1000"
+    bevy_streaming
+```
+
+This will force to use the CPU H264 encoder.
 
 ### Connect to the streamer
 

@@ -61,10 +61,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gstreamer1.0-plugins-good \
     gstreamer1.0-plugins-bad \
     gstreamer1.0-plugins-ugly \
+    # vaapi encoders    
+    gstreamer1.0-vaapi \
     gstreamer1.0-libav \
     gstreamer1.0-nice  \
     gstreamer1.0-tools \
     libasound2t64 \
+    # make vulkan backend available for mesa
+    mesa-vulkan-drivers \
+    # intel va encoder driver
+    intel-media-va-driver \
+    # useful to check vulkan drivers
+    vulkan-tools \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
