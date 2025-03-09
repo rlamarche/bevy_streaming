@@ -1,8 +1,10 @@
+use std::str::FromStr;
+
 use anyhow::Result;
-use bevy_capture::Encoder;
 use bevy_image::Image;
 use bevy_log::prelude::*;
 use derive_more::derive::{Display, Error};
+use drm_fourcc::DrmFourcc;
 use gst::prelude::*;
 use gstrswebrtc::{
     signaller::{Signallable, Signaller},
@@ -61,27 +63,62 @@ impl GstWebRtcEncoder {
 
         let pipeline = gst::Pipeline::default();
 
-        // Specify the format we want to provide as application into the pipeline
-        // by creating a video info with the given format and creating caps from it for the appsrc element.
-        let video_info = gst_video::VideoInfo::builder(
-            gst_video::VideoFormat::Rgba,
-            settings.width,
-            settings.height,
-        )
-        .build()
-        .expect("Failed to create video info");
+        let caps = gst::Caps::builder("video/x-raw")
+            .features([gst_allocators::CAPS_FEATURE_MEMORY_DMABUF])
+            .field("format", "DMA_DRM")
+            // .field("format", "RGBA")
+            // .field("drm-format", "ABGR8888")
+            .field("drm-format", DrmFourcc::Abgr8888.to_string())
+            // .field("drm-format", DrmFourcc::Rgba8888.to_string())
+            .field("width", settings.width)
+            .field("height", settings.height)
+            .field("framerate", gst::Fraction::new(60, 1))
+            .build();
+
+        info!("caps: {:?}", caps);
 
         let appsrc = gst_app::AppSrc::builder()
             .name("appsrc")
-            .do_timestamp(true)
+            // .do_timestamp(true)
             .is_live(true)
-            .caps(&video_info.to_caps().unwrap())
+            .caps(&caps)
             .format(gst::Format::Bytes)
             // Allocate space for 1 buffer
             .max_bytes((settings.width * settings.height * 4).into())
             .build();
 
-        let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
+        // let capsfilter = gst::ElementFactory::make("capsfilter")
+        //     .property("caps", &caps)
+        //     .build()?;
+
+        // let glcolorconvert = gst::ElementFactory::make("glcolorconvert").build()?;
+        let glupload = gst::ElementFactory::make("glupload").build()?;
+
+        let glupload_caps = gst::Caps::builder("video/x-raw")
+            .features([gst_gl::CAPS_FEATURE_MEMORY_GL_MEMORY])
+            .field("format", "RGBA")
+            // .field("format", "RGBA")
+            // .field("drm-format", "ABGR8888")
+            // .field("drm-format", DrmFourcc::Abgr8888.to_string())
+            // .field("drm-format", DrmFourcc::Rgba8888.to_string())
+            .field("width", settings.width)
+            .field("height", settings.height)
+            .field("framerate", gst::Fraction::new(60, 1))
+            .build();
+
+        info!("caps: {:?}", glupload_caps);
+
+        let capsfilter = gst::ElementFactory::make("capsfilter")
+            .property("caps", &glupload_caps)
+            .build()?;
+
+        let nvh264enc = gst::ElementFactory::make("nvh264enc").build()?;
+
+        // let glimagesink = gst::ElementFactory::make("glimagesink").build()?;
+        // let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
+        let fakesink = gst::ElementFactory::make("fakesink").build()?;
+        // let gldownload = gst::ElementFactory::make("gldownload").build()?;
+        // let autovideosink = gst::ElementFactory::make("autovideosink").build()?;
 
         let webrtcsink =
             webrtcsink::BaseWebRTCSink::with_signaller(settings.signalling_server.as_ref().into());
@@ -102,16 +139,24 @@ impl GstWebRtcEncoder {
             );
         }
 
-        pipeline.add_many([
-            appsrc.upcast_ref(),
-            &videoconvert,
-            webrtcsink.upcast_ref(),
-        ])?;
-        gst::Element::link_many([
-            appsrc.upcast_ref(),
-            &videoconvert,
-            webrtcsink.upcast_ref(),
-        ])?;
+        pipeline.add_many([appsrc.upcast_ref(), &glupload, &nvh264enc, &fakesink])?;
+        gst::Element::link_many([appsrc.upcast_ref(), &glupload, &nvh264enc, &fakesink])?;
+        // pipeline.add_many([
+        //     appsrc.upcast_ref(),
+        //     &capsfilter,
+        //     &glupload,
+        //     &glcolorconvert,
+        //     &glimagesink,
+        // ])?;
+        // gst::Element::link_many([
+        //     appsrc.upcast_ref(),
+        //     &capsfilter,
+        //     &glupload,
+        //     &glcolorconvert,
+        //     &glimagesink,
+        // ])?;
+        // pipeline.add_many([appsrc.upcast_ref(), &videoconvert, webrtcsink.upcast_ref()])?;
+        // gst::Element::link_many([appsrc.upcast_ref(), &videoconvert, webrtcsink.upcast_ref()])?;
 
         Ok(Self {
             settings,
@@ -160,10 +205,8 @@ impl GstWebRtcEncoder {
 
         Ok(())
     }
-}
 
-impl Encoder for GstWebRtcEncoder {
-    fn encode(&mut self, image: &Image) -> bevy_capture::encoder::Result<()> {
+    pub fn encode(&mut self, image: &Image) -> anyhow::Result<()> {
         if !self.started {
             self.start()?;
         }
@@ -178,7 +221,7 @@ impl Encoder for GstWebRtcEncoder {
 
         Ok(())
     }
-    fn finish(self: Box<Self>) {
+    pub fn finish(self: Box<Self>) {
         self.pipeline.set_state(gst::State::Null).unwrap();
     }
 }

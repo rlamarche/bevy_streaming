@@ -5,11 +5,20 @@ use bevy_input::{
     mouse::{MouseButtonInput, MouseMotion, MouseWheel},
 };
 use bevy_picking::PickSet;
-use bevy_render::prelude::*;
+use bevy_render::{
+    RenderApp,
+    prelude::*,
+    render_graph::RenderGraph,
+    renderer::{RenderDevice, RenderInstance},
+};
 use bevy_window::{PrimaryWindow, WindowEvent, prelude::*};
 
-use gst_webrtc_encoder::GstWebRtcEncoder;
+use capture::{
+    Capture, capture_extract,
+    driver::{CaptureDriver, CaptureLabel},
+};
 
+mod capture;
 mod helper;
 mod settings;
 
@@ -27,6 +36,7 @@ enum ControllerState {
     PSControllerState(PSControllerState),
 }
 
+use gst_webrtc_encoder::GstWebRtcEncoder;
 pub use helper::*;
 pub use settings::*;
 
@@ -41,13 +51,30 @@ pub struct StreamerPlugin;
 
 impl Plugin for StreamerPlugin {
     fn build(&self, app: &mut bevy_app::App) {
-        app.add_plugins(bevy_capture::CapturePlugin);
+        // app.add_plugins(bevy_capture::CapturePlugin);
+
+        let render_app = app
+            // .insert_resource(MainWorldReceiver(r))
+            .sub_app_mut(RenderApp);
+
+        let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
+        graph.add_node(CaptureLabel, CaptureDriver);
+        graph.add_node_edge(bevy_render::graph::CameraDriverLabel, CaptureLabel);
+
+        render_app
+            // .insert_resource(RenderWorldSender(s))
+            // Make ImageCopiers accessible in RenderWorld system and plugin
+            .add_systems(ExtractSchedule, capture_extract)
+            // Receives image data from buffer to channel
+            // so we need to run it after the render graph is done
+            // .add_systems(Render, receive_image_from_buffer.after(RenderSet::Render))
+        ;
 
         app.add_systems(
             PreUpdate,
             (
-                process_encoder_events,
-                start_capturing,
+                // process_encoder_events,
+                // start_capturing,
                 handle_controller_messages.in_set(PickSet::Input),
             ),
         );
@@ -56,20 +83,20 @@ impl Plugin for StreamerPlugin {
 }
 
 /// Process gstreamer encoder's events
-fn process_encoder_events(encoders: Query<&Encoder>) {
-    for encoder in encoders.iter() {
-        encoder.0.process_events().expect("Error processing events");
-    }
-}
+// fn process_encoder_events(encoders: Query<&Encoder>) {
+//     for encoder in encoders.iter() {
+//         encoder.0.process_events().expect("Error processing events");
+//     }
+// }
 
 /// Starts all ready streamers
-fn start_capturing(mut streamers: Query<(&mut bevy_capture::Capture, &Encoder)>) {
-    for (mut capture, encoder) in streamers.iter_mut() {
-        if !capture.is_capturing() {
-            capture.start(encoder.0.clone());
-        }
-    }
-}
+// fn start_capturing(mut streamers: Query<(&mut bevy_capture::Capture, &Encoder)>) {
+//     for (mut capture, encoder) in streamers.iter_mut() {
+//         if !capture.is_capturing() {
+//             capture.start(encoder.0.clone());
+//         }
+//     }
+// }
 
 /// This system process added and removed message handlers and update controller state
 /// And it process messages from Pixel Streaming

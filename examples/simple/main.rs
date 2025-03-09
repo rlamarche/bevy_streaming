@@ -83,22 +83,22 @@ fn setup_cameras(mut commands: Commands, mut streamer: StreamerHelper) {
         ))
         .id();
 
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(2.5, 12.0, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
-        streamer.new_streamer_camera(StreamerSettings {
-            signalling_server: SignallingServer::PixelStreaming {
-                uri: "ws://localhost:8888".to_string(),
-                streamer_id: Some("spectator".to_string()),
-            },
-            width: 1920,
-            height: 1080,
-            video_caps: Some("video/x-h264".to_string()),
-            congestion_control: Some(CongestionControl::Disabled),
-            enable_controller: false,
-        }),
-        SpectatorCamera,
-    ));
+    // commands.spawn((
+    //     Camera3d::default(),
+    //     Transform::from_xyz(2.5, 12.0, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
+    //     streamer.new_streamer_camera(StreamerSettings {
+    //         signalling_server: SignallingServer::PixelStreaming {
+    //             uri: "ws://localhost:8888".to_string(),
+    //             streamer_id: Some("spectator".to_string()),
+    //         },
+    //         width: 1920,
+    //         height: 1080,
+    //         video_caps: Some("video/x-h264".to_string()),
+    //         congestion_control: Some(CongestionControl::Disabled),
+    //         enable_controller: false,
+    //     }),
+    //     SpectatorCamera,
+    // ));
 
     commands.spawn((
         Text::new("You need to specify TargetCamera to display UI elements, because there is no main window."),
@@ -165,9 +165,10 @@ fn update_player_position_and_spectator_view(
     >,
 ) {
     let camera_transform = q_player_camera_transform.single();
-    let mut spectator_camera_transform = q_spectator_camera_transform.single_mut();
     let mut player_position = q_player_transform.single_mut();
 
     player_position.translation = camera_transform.translation;
-    spectator_camera_transform.look_at(camera_transform.translation, Vec3::Y);
+
+    // let mut spectator_camera_transform = q_spectator_camera_transform.single_mut();
+    // spectator_camera_transform.look_at(camera_transform.translation, Vec3::Y);
 }
