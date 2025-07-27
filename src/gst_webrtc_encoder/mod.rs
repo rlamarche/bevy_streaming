@@ -1,6 +1,4 @@
 use anyhow::Result;
-use bevy_capture::Encoder;
-use bevy_image::Image;
 use bevy_log::prelude::*;
 use derive_more::derive::{Display, Error};
 use gst::prelude::*;
@@ -81,6 +79,9 @@ impl GstWebRtcEncoder {
             .max_bytes((settings.width * settings.height * 4).into())
             .build();
 
+        let queue = gst::ElementFactory::make("queue").build()?;
+        queue.set_property_from_str("leaky", "downstream");
+
         let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
 
         let webrtcsink =
@@ -104,11 +105,13 @@ impl GstWebRtcEncoder {
 
         pipeline.add_many([
             appsrc.upcast_ref(),
+            &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
         gst::Element::link_many([
             appsrc.upcast_ref(),
+            &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
@@ -160,25 +163,23 @@ impl GstWebRtcEncoder {
 
         Ok(())
     }
-}
 
-impl Encoder for GstWebRtcEncoder {
-    fn encode(&mut self, image: &Image) -> bevy_capture::encoder::Result<()> {
+    pub fn push_buffer(&mut self, data: &Vec<u8>) -> anyhow::Result<()> {
         if !self.started {
             self.start()?;
         }
 
-        let mut buffer = gst::Buffer::with_size(image.data.len()).unwrap();
+        let mut buffer = gst::Buffer::with_size(data.len()).unwrap();
         {
             let buffer = buffer.get_mut().unwrap();
-            buffer.copy_from_slice(0, &image.data).unwrap();
+            buffer.copy_from_slice(0, data).unwrap();
         }
 
         let _ = self.appsrc.push_buffer(buffer);
 
         Ok(())
     }
-    fn finish(self: Box<Self>) {
+    pub fn finish(self: Box<Self>) {
         self.pipeline.set_state(gst::State::Null).unwrap();
     }
 }

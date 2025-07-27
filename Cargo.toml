@@ -14,18 +14,19 @@ name = "simple"
 required-features = ["pixelstreaming"]
 
 [dependencies]
-bevy_app = "0.15"
-bevy_ecs = "0.15"
-bevy_render = "0.15"
-bevy_asset = "0.15"
-bevy_image = "0.15"
-bevy_log = "0.15"
-bevy_input = "0.15"
-bevy_picking = "0.15"
-bevy_math = "0.15"
-bevy_window = "0.15"
-bevy_utils = "0.15"
-bevy_capture = "0.2"
+bevy_app = { version = "0.16" }
+bevy_ecs = { version = "0.16" }
+bevy_render = { version = "0.16" }
+bevy_asset = { version = "0.16" }
+bevy_image = { version = "0.16" }
+bevy_log = { version = "0.16" }
+bevy_input = { version = "0.16" }
+bevy_picking = { version = "0.16" }
+bevy_math = { version = "0.16" }
+bevy_window = { version = "0.16" }
+bevy_utils = { version = "0.16" }
+bevy_derive = { version = "0.16" }
+bevy_platform = { version = "0.16" }
 crossbeam-channel = "0.5"
 
 ## GSTREAMER
@@ -42,7 +43,6 @@ gst-plugin-webrtc = "0.13.3"
 gst-plugin-rtp = "0.13.3"
 anyhow = "1"
 derive_more = { version = "1", features = ["display", "error"] }
-
 
 tokio = { version = "1", features = [
     "fs",
@@ -64,7 +64,7 @@ url = { version = "2", optional = true }
 byteorder = { version = "1.5.0", optional = true }
 
 [dev-dependencies]
-bevy = "0.15"
+bevy = { version = "0.16" }
 
 [features]
 default = ["pixelstreaming"]

@@ -1,4 +1,4 @@
-use bevy_utils::HashMap;
+use bevy_platform::collections::HashMap;
 use crossbeam_channel::Receiver;
 
 use super::handler::PSMessageHandler;

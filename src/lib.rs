@@ -1,15 +1,20 @@
 use bevy_app::prelude::*;
+use bevy_derive::Deref;
 use bevy_ecs::prelude::*;
 use bevy_input::{
     keyboard::KeyboardInput,
     mouse::{MouseButtonInput, MouseMotion, MouseWheel},
 };
 use bevy_picking::PickSet;
-use bevy_render::prelude::*;
+use bevy_render::{Render, RenderApp, RenderSet, prelude::*, render_graph::RenderGraph};
 use bevy_window::{PrimaryWindow, WindowEvent, prelude::*};
 
-use gst_webrtc_encoder::GstWebRtcEncoder;
+use capture::{
+    capture_extract,
+    driver::{CaptureDriver, CaptureLabel},
+};
 
+mod capture;
 mod helper;
 mod settings;
 
@@ -18,15 +23,13 @@ pub mod gst_webrtc_encoder;
 mod pixelstreaming;
 
 #[derive(Component)]
-struct Encoder(GstWebRtcEncoder);
-
-#[derive(Component)]
 enum ControllerState {
     None,
     #[cfg(feature = "pixelstreaming")]
     PSControllerState(PSControllerState),
 }
 
+use crossbeam_channel::{Receiver, Sender};
 pub use helper::*;
 pub use settings::*;
 
@@ -37,17 +40,43 @@ use pixelstreaming::{
     utils::{PSConversions, PSKeyCode},
 };
 
+use crate::capture::driver::receive_image_from_buffer;
+
 pub struct StreamerPlugin;
+
+/// This will receive asynchronously any data sent from the render world
+#[derive(Resource, Deref)]
+struct MainWorldReceiver(Receiver<Vec<u8>>);
+
+/// This will send asynchronously any data to the main world
+#[derive(Resource, Deref)]
+struct RenderWorldSender(Sender<Vec<u8>>);
 
 impl Plugin for StreamerPlugin {
     fn build(&self, app: &mut bevy_app::App) {
-        app.add_plugins(bevy_capture::CapturePlugin);
+        let (s, r) = crossbeam_channel::unbounded();
+
+        let render_app = app
+            .insert_resource(MainWorldReceiver(r))
+            .sub_app_mut(RenderApp);
+
+        let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
+        graph.add_node(CaptureLabel, CaptureDriver);
+        graph.add_node_edge(bevy_render::graph::CameraDriverLabel, CaptureLabel);
+
+        render_app
+            .insert_resource(RenderWorldSender(s))
+            // Make ImageCopiers accessible in RenderWorld system and plugin
+            .add_systems(ExtractSchedule, capture_extract)
+            // Receives image data from buffer to channel
+            // so we need to run it after the render graph is done
+            .add_systems(Render, receive_image_from_buffer.after(RenderSet::Render));
 
         app.add_systems(
             PreUpdate,
             (
-                process_encoder_events,
-                start_capturing,
+                // process_encoder_events,
+                // start_capturing,
                 handle_controller_messages.in_set(PickSet::Input),
             ),
         );
@@ -56,20 +85,20 @@ impl Plugin for StreamerPlugin {
 }
 
 /// Process gstreamer encoder's events
-fn process_encoder_events(encoders: Query<&Encoder>) {
-    for encoder in encoders.iter() {
-        encoder.0.process_events().expect("Error processing events");
-    }
-}
+// fn process_encoder_events(encoders: Query<&Encoder>) {
+//     for encoder in encoders.iter() {
+//         encoder.0.process_events().expect("Error processing events");
+//     }
+// }
 
 /// Starts all ready streamers
-fn start_capturing(mut streamers: Query<(&mut bevy_capture::Capture, &Encoder)>) {
-    for (mut capture, encoder) in streamers.iter_mut() {
-        if !capture.is_capturing() {
-            capture.start(encoder.0.clone());
-        }
-    }
-}
+// fn start_capturing(mut streamers: Query<(&mut bevy_capture::Capture, &Encoder)>) {
+//     for (mut capture, encoder) in streamers.iter_mut() {
+//         if !capture.is_capturing() {
+//             capture.start(encoder.0.clone());
+//         }
+//     }
+// }
 
 /// This system process added and removed message handlers and update controller state
 /// And it process messages from Pixel Streaming
@@ -103,7 +132,7 @@ fn handle_controller_messages(
     mut window_events: EventWriter<WindowEvent>,
     mut keyboard_input_events: EventWriter<KeyboardInput>,
 ) {
-    let window = windows.get_single().unwrap().0;
+    let window = windows.single().unwrap().0;
 
     for (camera, mut controller) in controllers.iter_mut() {
         let controller = controller.as_mut();
@@ -115,14 +144,14 @@ fn handle_controller_messages(
                     for ue_msg in handler.message_receiver.try_iter() {
                         match ue_msg {
                             PSMessage::MouseMove(mouse_move) => {
-                                mouse_motion_event.send(MouseMotion {
+                                mouse_motion_event.write(MouseMotion {
                                     delta: ps_conversions.from_ps_delta(
                                         camera,
                                         mouse_move.delta_x,
                                         mouse_move.delta_y,
                                     ),
                                 });
-                                window_events.send(WindowEvent::CursorMoved(CursorMoved {
+                                window_events.write(WindowEvent::CursorMoved(CursorMoved {
                                     window,
                                     position: ps_conversions.from_ps_position(
                                         camera,
@@ -137,14 +166,14 @@ fn handle_controller_messages(
                                 }));
                             }
                             PSMessage::MouseDown(mouse_down) => {
-                                mouse_button_input_events.send(MouseButtonInput {
+                                mouse_button_input_events.write(MouseButtonInput {
                                     button: ps_conversions.ps_to_mouse_button(mouse_down.button),
                                     state: bevy_input::ButtonState::Pressed,
                                     window,
                                 });
                             }
                             PSMessage::MouseUp(mouse_up) => {
-                                mouse_button_input_events.send(MouseButtonInput {
+                                mouse_button_input_events.write(MouseButtonInput {
                                     button: ps_conversions.ps_to_mouse_button(mouse_up.button),
                                     state: bevy_input::ButtonState::Released,
                                     window,
@@ -153,28 +182,30 @@ fn handle_controller_messages(
                             PSMessage::UiInteraction(_ui_interaction) => {}
                             PSMessage::Command(_command) => {}
                             PSMessage::KeyDown(key_down) => {
-                                keyboard_input_events.send(KeyboardInput {
+                                keyboard_input_events.write(KeyboardInput {
                                     key_code: PSKeyCode(key_down.key_code).into(),
                                     logical_key: PSKeyCode(key_down.key_code).into(),
                                     state: bevy_input::ButtonState::Pressed,
                                     repeat: key_down.is_repeat == 1,
                                     window,
+                                    text: None,
                                 });
                             }
                             PSMessage::KeyUp(key_up) => {
-                                keyboard_input_events.send(KeyboardInput {
+                                keyboard_input_events.write(KeyboardInput {
                                     key_code: PSKeyCode(key_up.key_code).into(),
                                     logical_key: PSKeyCode(key_up.key_code).into(),
                                     state: bevy_input::ButtonState::Released,
                                     repeat: false,
                                     window,
+                                    text: None,
                                 });
                             }
                             PSMessage::KeyPress(_key_press) => {}
                             PSMessage::MouseEnter => {}
                             PSMessage::MouseLeave => {}
                             PSMessage::MouseWheel(mouse_wheel) => {
-                                mouse_wheel_events.send(MouseWheel {
+                                mouse_wheel_events.write(MouseWheel {
                                     unit: bevy_input::mouse::MouseScrollUnit::Pixel,
                                     x: 0_f32,
                                     y: mouse_wheel.delta as f32 / 10.0,

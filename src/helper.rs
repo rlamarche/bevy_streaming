@@ -1,30 +1,31 @@
 use bevy_asset::prelude::*;
-use bevy_capture::{CameraTargetHeadless, CaptureBundle};
 use bevy_ecs::{prelude::*, system::SystemParam};
 use bevy_image::prelude::*;
 use bevy_log::prelude::*;
-use bevy_render::prelude::*;
-use bevy_utils::HashMap;
+use bevy_render::{prelude::*, renderer::RenderDevice};
 use gst::prelude::*;
 use gstrswebrtc::webrtcsink;
 
-use crate::{ControllerState, Encoder, StreamerSettings, gst_webrtc_encoder::GstWebRtcEncoder};
+use crate::{
+    ControllerState, StreamerSettings, capture::setup_render_target,
+    gst_webrtc_encoder::GstWebRtcEncoder,
+};
 
 #[cfg(feature = "pixelstreaming")]
 use crate::pixelstreaming::{controller::PSControllerState, handler::PSMessageHandler};
 
 #[derive(SystemParam)]
-pub struct StreamerHelper<'w> {
+pub struct StreamerHelper<'w, 's> {
+    commands: Commands<'w, 's>,
     images: ResMut<'w, Assets<Image>>,
+    render_device: Res<'w, RenderDevice>,
 }
 
-impl<'w> StreamerHelper<'w> {
+impl<'w, 's> StreamerHelper<'w, 's> {
     pub fn new_streamer_camera(&mut self, settings: StreamerSettings) -> impl Bundle {
-        let camera =
-            Camera::default().target_headless(settings.width, settings.height, &mut self.images);
-
-        let encoder = GstWebRtcEncoder::with_settings(settings.clone())
+        let mut encoder = GstWebRtcEncoder::with_settings(settings.clone())
             .expect("Unable to create gst encoder");
+        encoder.start().expect("Unable to start pipeline");
 
         // Bind controller if enabled
         let controller_state = if settings.enable_controller {
@@ -43,17 +44,29 @@ impl<'w> StreamerHelper<'w> {
             ControllerState::None
         };
 
-        (
-            camera,
-            CaptureBundle::default(),
-            Encoder(encoder),
-            controller_state,
-        )
+        let render_target = setup_render_target(
+            &mut self.commands,
+            &mut self.images,
+            &self.render_device,
+            // &self.render_instance,
+            settings.width,
+            settings.height,
+            encoder,
+        );
+
+        let camera = Camera {
+            target: render_target,
+            ..Default::default()
+        };
+
+        (camera, controller_state)
     }
 }
 
 #[cfg(feature = "pixelstreaming")]
 fn create_pixelstreaming_controller(encoder: &GstWebRtcEncoder) -> ControllerState {
+    use bevy_platform::collections::HashMap;
+
     let (sender, receiver) = crossbeam_channel::unbounded::<(String, Option<PSMessageHandler>)>();
 
     encoder
