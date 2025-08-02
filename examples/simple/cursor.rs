@@ -24,7 +24,7 @@ fn setup(
 
     let mut spawnpos = (0.0, 0.0);
 
-    if let Some(position) = q_window.single().cursor_position() {
+    if let Some(position) = q_window.single().unwrap().cursor_position() {
         spawnpos = (position.x, position.y);
     }
 
@@ -43,13 +43,13 @@ fn setup(
 fn update_cursor_camera(
     mut commands: Commands,
     q_camera: Query<Entity, With<Camera>>,
-    q_cursor: Query<Entity, (With<Cursor>, Without<TargetCamera>)>,
+    q_cursor: Query<Entity, (With<Cursor>, Without<UiTargetCamera>)>,
 ) {
     if let Some(cursor_entity) = q_cursor.iter().next() {
         if let Some(camera_entity) = q_camera.iter().next() {
             commands
                 .entity(cursor_entity)
-                .insert(TargetCamera(camera_entity));
+                .insert(UiTargetCamera(camera_entity));
         }
     }
 }
@@ -65,7 +65,7 @@ fn update_cursor_position(
         .filter(|event| matches!(event, WindowEvent::CursorMoved(..)))
         .last()
     {
-        let cursor = cursor.as_mut();
+        let cursor = cursor.as_mut().unwrap();
         cursor.top = Val::Px(cursor_moved.position.y);
         cursor.left = Val::Px(cursor_moved.position.x);
     }

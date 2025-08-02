@@ -1,6 +1,4 @@
 use anyhow::Result;
-use bevy_capture::Encoder;
-use bevy_image::Image;
 use bevy_log::prelude::*;
 use derive_more::derive::{Display, Error};
 use gst::prelude::*;
@@ -52,7 +50,6 @@ pub struct GstWebRtcEncoder {
     pipeline: gst::Pipeline,
     pub appsrc: gst_app::AppSrc,
     pub webrtcsink: BaseWebRTCSink,
-    started: bool,
 }
 
 impl GstWebRtcEncoder {
@@ -81,6 +78,9 @@ impl GstWebRtcEncoder {
             .max_bytes((settings.width * settings.height * 4).into())
             .build();
 
+        // let queue = gst::ElementFactory::make("queue").build()?;
+        // queue.set_property_from_str("leaky", "downstream");
+
         let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
 
         let webrtcsink =
@@ -104,11 +104,13 @@ impl GstWebRtcEncoder {
 
         pipeline.add_many([
             appsrc.upcast_ref(),
+            // &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
         gst::Element::link_many([
             appsrc.upcast_ref(),
+            // &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
@@ -118,14 +120,12 @@ impl GstWebRtcEncoder {
             pipeline,
             appsrc,
             webrtcsink,
-            started: false,
         })
     }
 
-    pub fn start(&mut self) -> Result<()> {
+    pub fn start(&self) -> Result<()> {
         info!("Start pipeline");
         self.pipeline.set_state(gst::State::Playing)?;
-        self.started = true;
 
         Ok(())
     }
@@ -160,25 +160,19 @@ impl GstWebRtcEncoder {
 
         Ok(())
     }
-}
 
-impl Encoder for GstWebRtcEncoder {
-    fn encode(&mut self, image: &Image) -> bevy_capture::encoder::Result<()> {
-        if !self.started {
-            self.start()?;
-        }
-
-        let mut buffer = gst::Buffer::with_size(image.data.len()).unwrap();
+    pub fn push_buffer(&self, data: &Vec<u8>) -> anyhow::Result<()> {
+        let mut buffer = gst::Buffer::with_size(data.len()).unwrap();
         {
             let buffer = buffer.get_mut().unwrap();
-            buffer.copy_from_slice(0, &image.data).unwrap();
+            buffer.copy_from_slice(0, data).unwrap();
         }
 
         let _ = self.appsrc.push_buffer(buffer);
 
         Ok(())
     }
-    fn finish(self: Box<Self>) {
+    pub fn finish(self: Box<Self>) {
         self.pipeline.set_state(gst::State::Null).unwrap();
     }
 }

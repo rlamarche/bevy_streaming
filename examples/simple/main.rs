@@ -1,8 +1,5 @@
 use bevy::{
-    app::{RunMode, ScheduleRunnerPlugin},
-    prelude::*,
-    render::RenderPlugin,
-    time::TimeUpdateStrategy,
+    app::ScheduleRunnerPlugin, prelude::*, render::RenderPlugin, time::TimeUpdateStrategy,
     winit::WinitPlugin,
 };
 use bevy_streaming::{
@@ -29,9 +26,10 @@ fn main() -> AppExit {
                 ..default()
             }),
         // Add the ScheduleRunnerPlugin to run the app in loop mode
-        ScheduleRunnerPlugin {
-            run_mode: RunMode::Loop { wait: None },
-        },
+        ScheduleRunnerPlugin::run_loop(
+            // Run 60 times per second.
+            Duration::from_secs_f64(1.0 / 60.0),
+        ),
         StreamerPlugin,
         CameraControllerPlugin,
         CursorPlugin,
@@ -108,7 +106,7 @@ fn setup_cameras(mut commands: Commands, mut streamer: StreamerHelper) {
             left: Val::Px(12.0),
             ..default()
         },
-        TargetCamera(main_camera),
+        UiTargetCamera(main_camera),
     ));
 }
 
@@ -164,10 +162,11 @@ fn update_player_position_and_spectator_view(
         (With<SpectatorCamera>, Without<Player>),
     >,
 ) {
-    let camera_transform = q_player_camera_transform.single();
-    let mut spectator_camera_transform = q_spectator_camera_transform.single_mut();
-    let mut player_position = q_player_transform.single_mut();
+    let camera_transform = q_player_camera_transform.single().unwrap();
+    let mut player_position = q_player_transform.single_mut().unwrap();
 
     player_position.translation = camera_transform.translation;
+
+    let mut spectator_camera_transform = q_spectator_camera_transform.single_mut().unwrap();
     spectator_camera_transform.look_at(camera_transform.translation, Vec3::Y);
 }
