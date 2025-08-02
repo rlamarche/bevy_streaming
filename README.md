@@ -2,6 +2,8 @@
 
 This is a Bevy plugin for Cloud Gaming.
 
+![Alt text](screenshots/simple.jpg)
+
 It allows to stream Bevy's camera to a streaming server (through WebRTC) with ultra-low latency, and play the game through a simple browser or phone.
 
 You can imagine any kind of game of application, using cloud provider's powerful GPUs, and simply stream the content to any device compatible with WebRTC.
