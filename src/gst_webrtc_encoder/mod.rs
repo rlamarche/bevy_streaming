@@ -50,7 +50,6 @@ pub struct GstWebRtcEncoder {
     pipeline: gst::Pipeline,
     pub appsrc: gst_app::AppSrc,
     pub webrtcsink: BaseWebRTCSink,
-    started: bool,
 }
 
 impl GstWebRtcEncoder {
@@ -79,8 +78,8 @@ impl GstWebRtcEncoder {
             .max_bytes((settings.width * settings.height * 4).into())
             .build();
 
-        let queue = gst::ElementFactory::make("queue").build()?;
-        queue.set_property_from_str("leaky", "downstream");
+        // let queue = gst::ElementFactory::make("queue").build()?;
+        // queue.set_property_from_str("leaky", "downstream");
 
         let videoconvert = gst::ElementFactory::make("videoconvert").build()?;
 
@@ -105,13 +104,13 @@ impl GstWebRtcEncoder {
 
         pipeline.add_many([
             appsrc.upcast_ref(),
-            &queue,
+            // &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
         gst::Element::link_many([
             appsrc.upcast_ref(),
-            &queue,
+            // &queue,
             &videoconvert,
             webrtcsink.upcast_ref(),
         ])?;
@@ -121,14 +120,12 @@ impl GstWebRtcEncoder {
             pipeline,
             appsrc,
             webrtcsink,
-            started: false,
         })
     }
 
-    pub fn start(&mut self) -> Result<()> {
+    pub fn start(&self) -> Result<()> {
         info!("Start pipeline");
         self.pipeline.set_state(gst::State::Playing)?;
-        self.started = true;
 
         Ok(())
     }
@@ -164,11 +161,7 @@ impl GstWebRtcEncoder {
         Ok(())
     }
 
-    pub fn push_buffer(&mut self, data: &Vec<u8>) -> anyhow::Result<()> {
-        if !self.started {
-            self.start()?;
-        }
-
+    pub fn push_buffer(&self, data: &Vec<u8>) -> anyhow::Result<()> {
         let mut buffer = gst::Buffer::with_size(data.len()).unwrap();
         {
             let buffer = buffer.get_mut().unwrap();

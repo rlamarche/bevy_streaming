@@ -1,8 +1,5 @@
 use bevy::{
-    app::{RunMode, ScheduleRunnerPlugin},
-    prelude::*,
-    render::RenderPlugin,
-    time::TimeUpdateStrategy,
+    app::ScheduleRunnerPlugin, prelude::*, render::RenderPlugin, time::TimeUpdateStrategy,
     winit::WinitPlugin,
 };
 use bevy_streaming::{
@@ -29,9 +26,10 @@ fn main() -> AppExit {
                 ..default()
             }),
         // Add the ScheduleRunnerPlugin to run the app in loop mode
-        ScheduleRunnerPlugin {
-            run_mode: RunMode::Loop { wait: None },
-        },
+        ScheduleRunnerPlugin::run_loop(
+            // Run 60 times per second.
+            Duration::from_secs_f64(1.0 / 60.0),
+        ),
         StreamerPlugin,
         CameraControllerPlugin,
         CursorPlugin,

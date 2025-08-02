@@ -23,7 +23,7 @@ pub struct StreamerHelper<'w, 's> {
 
 impl<'w, 's> StreamerHelper<'w, 's> {
     pub fn new_streamer_camera(&mut self, settings: StreamerSettings) -> impl Bundle {
-        let mut encoder = GstWebRtcEncoder::with_settings(settings.clone())
+        let encoder = GstWebRtcEncoder::with_settings(settings.clone())
             .expect("Unable to create gst encoder");
         encoder.start().expect("Unable to start pipeline");
 

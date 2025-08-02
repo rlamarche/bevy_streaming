@@ -1,5 +1,4 @@
 use bevy_app::prelude::*;
-use bevy_derive::Deref;
 use bevy_ecs::prelude::*;
 use bevy_input::{
     keyboard::KeyboardInput,
@@ -28,8 +27,6 @@ enum ControllerState {
     #[cfg(feature = "pixelstreaming")]
     PSControllerState(PSControllerState),
 }
-
-use crossbeam_channel::{Receiver, Sender};
 pub use helper::*;
 pub use settings::*;
 
@@ -40,65 +37,44 @@ use pixelstreaming::{
     utils::{PSConversions, PSKeyCode},
 };
 
-use crate::capture::driver::receive_image_from_buffer;
+use crate::capture::{
+    ReleaseBufferSignal, WorkerSendBuffer,
+    driver::{receive_image_from_buffer, release_mapped_buffers},
+    spawn_worker,
+};
 
 pub struct StreamerPlugin;
 
-/// This will receive asynchronously any data sent from the render world
-#[derive(Resource, Deref)]
-struct MainWorldReceiver(Receiver<Vec<u8>>);
-
-/// This will send asynchronously any data to the main world
-#[derive(Resource, Deref)]
-struct RenderWorldSender(Sender<Vec<u8>>);
-
 impl Plugin for StreamerPlugin {
     fn build(&self, app: &mut bevy_app::App) {
-        let (s, r) = crossbeam_channel::unbounded();
+        let render_app = app.sub_app_mut(RenderApp);
 
-        let render_app = app
-            .insert_resource(MainWorldReceiver(r))
-            .sub_app_mut(RenderApp);
+        let (tx_job, rx_release) = spawn_worker();
+
+        render_app.insert_resource(WorkerSendBuffer { tx: tx_job });
+        render_app.insert_resource(ReleaseBufferSignal { rx: rx_release });
 
         let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
         graph.add_node(CaptureLabel, CaptureDriver);
         graph.add_node_edge(bevy_render::graph::CameraDriverLabel, CaptureLabel);
 
         render_app
-            .insert_resource(RenderWorldSender(s))
-            // Make ImageCopiers accessible in RenderWorld system and plugin
             .add_systems(ExtractSchedule, capture_extract)
-            // Receives image data from buffer to channel
-            // so we need to run it after the render graph is done
-            .add_systems(Render, receive_image_from_buffer.after(RenderSet::Render));
+            .add_systems(
+                Render,
+                (
+                    receive_image_from_buffer.after(RenderSet::Render),
+                    release_mapped_buffers.after(RenderSet::Render),
+                ),
+            );
 
         app.add_systems(
             PreUpdate,
-            (
-                // process_encoder_events,
-                // start_capturing,
-                handle_controller_messages.in_set(PickSet::Input),
-            ),
+            (handle_controller_messages.in_set(PickSet::Input),),
         );
         app.add_systems(PostUpdate, handle_controllers);
     }
 }
-
-/// Process gstreamer encoder's events
-// fn process_encoder_events(encoders: Query<&Encoder>) {
-//     for encoder in encoders.iter() {
-//         encoder.0.process_events().expect("Error processing events");
-//     }
-// }
-
-/// Starts all ready streamers
-// fn start_capturing(mut streamers: Query<(&mut bevy_capture::Capture, &Encoder)>) {
-//     for (mut capture, encoder) in streamers.iter_mut() {
-//         if !capture.is_capturing() {
-//             capture.start(encoder.0.clone());
-//         }
-//     }
-// }
 
 /// This system process added and removed message handlers and update controller state
 /// And it process messages from Pixel Streaming
