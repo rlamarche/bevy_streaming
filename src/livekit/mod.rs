@@ -86,6 +86,9 @@ impl LiveKitEncoder {
         gst::init()?;
         
         info!("Creating LiveKit encoder with GStreamer...");
+        info!("LiveKit URL: {}", config.url);
+        info!("Room: {}", config.room_name);
+        info!("Participant: {} ({})", config.participant_name, config.participant_identity);
         
         // Calculate appropriate bitrate based on resolution
         // Roughly 0.1 bits per pixel for 60fps as baseline
@@ -122,7 +125,8 @@ impl LiveKitEncoder {
             config.participant_name
         );
         
-        info!("Creating LiveKit pipeline");
+        info!("Creating LiveKit pipeline with command:");
+        info!("Pipeline: {}", pipeline_str);
         
         let pipeline = match gst::parse::launch(&pipeline_str) {
             Ok(pipeline) => {
@@ -195,9 +199,10 @@ impl LiveKitEncoder {
                             .map(|s| s.path_string().to_string())
                             .unwrap_or_else(|| "unknown".to_string());
                         
-                        if src_name.contains("livekit") || src_name.contains("pipeline") {
+                        // Log important state changes
+                        if src_name.contains("livekit") || src_name.contains("webrtcbin") || src_name == "pipeline0" {
                             info!(
-                                "LiveKit state change [{}]: {:?} -> {:?} (pending: {:?})",
+                                "State change [{}]: {:?} -> {:?} (pending: {:?})",
                                 src_name,
                                 state_changed.old(),
                                 state_changed.current(),
@@ -207,10 +212,13 @@ impl LiveKitEncoder {
                     }
                     gst::MessageView::Element(element) => {
                         if let Some(structure) = element.structure() {
-                            if structure.name() == "GstBinForwarded" {
-                                // Skip forwarded messages
-                            } else {
-                                info!("LiveKit element message: {:?}", structure.name());
+                            let name = structure.name();
+                            if name == "GstBinForwarded" {
+                                // Skip most forwarded messages
+                            } else if name.contains("signaller") || name.contains("webrtc") || name.contains("ice") {
+                                info!("WebRTC message [{}]: {:?}", name, structure.to_string());
+                            } else if name.contains("connection") || name.contains("state") {
+                                info!("Connection message [{}]: {:?}", name, structure.to_string());
                             }
                         }
                     }
@@ -218,13 +226,40 @@ impl LiveKitEncoder {
                         warn!("LiveKit pipeline: End of stream - this shouldn't happen!");
                         break;
                     }
+                    gst::MessageView::Info(info) => {
+                        info!(
+                            "Info from {:?}: {} ({:?})",
+                            info.src().map(|s| s.path_string()),
+                            info.error(),
+                            info.debug()
+                        );
+                    }
+                    gst::MessageView::StreamStatus(status) => {
+                        info!("Stream status: {:?}", status.stream_status_object());
+                    }
                     _ => {}
                 }
             }
         });
         
-        pipeline.set_state(gst::State::Playing)
-            .context("Failed to set pipeline to playing state")?;
+        info!("Setting pipeline to Playing state...");
+        let state_result = pipeline.set_state(gst::State::Playing);
+        match state_result {
+            Ok(gst::StateChangeSuccess::Success) => debug!("Pipeline state changed to Playing immediately"),
+            Ok(gst::StateChangeSuccess::Async) => debug!("Pipeline state change to Playing is async"),
+            Ok(gst::StateChangeSuccess::NoPreroll) => debug!("Pipeline state changed to Playing (no preroll)"),
+            Err(e) => {
+                error!("Failed to set pipeline to Playing: {:?}", e);
+                return Err(anyhow::anyhow!("Failed to set pipeline to playing state: {:?}", e));
+            }
+        }
+        
+        // Give pipeline a moment to initialize
+        std::thread::sleep(std::time::Duration::from_millis(100));
+        
+        // Check current state
+        let (state_change, current, pending) = pipeline.state(gst::ClockTime::from_seconds(1));
+        debug!("Pipeline state after initialization: current={:?}, pending={:?}, result={:?}", current, pending, state_change);
         
         info!("LiveKit pipeline started successfully");
         

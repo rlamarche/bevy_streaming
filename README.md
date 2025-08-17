@@ -117,6 +117,8 @@ cargo run --example livekit --features livekit
 
 5. Connect using the LiveKit meet app at https://meet.livekit.io/
 
+![LiveKit Demo](livekit_demo.png)
+
 ### Build the headless Docker image
 
 I've provided a Dockerfile in `docker/Dockerfile` that runs the example as a starting point for you to build your own Docker images.
