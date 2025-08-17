@@ -165,9 +165,7 @@ pub fn spawn_worker() -> (Sender<SendBufferJob>, Receiver<ReleaseSignal>) {
             let data = slice.get_mapped_range().to_vec();
 
 
-            if let Err(e) = job.encoder.push_frame(&data) {
-                error!("Failed to push frame to encoder: {:?}", e);
-            }
+            let _ = job.encoder.push_frame(&data);
 
             if let Err(e) = tx_release.send(ReleaseSignal {
                 capture_idx: job.capture_idx,

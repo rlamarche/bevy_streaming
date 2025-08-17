@@ -12,7 +12,6 @@ BUILD_DIR="/tmp/gst-plugins-rs-build"
 mkdir -p "$BUILD_DIR"
 cd "$BUILD_DIR"
 
-# Clone the repository
 if [ ! -d "gst-plugins-rs" ]; then
     echo "Cloning gst-plugins-rs repository..."
     git clone https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs.git

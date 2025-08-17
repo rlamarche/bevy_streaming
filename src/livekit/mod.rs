@@ -194,7 +194,6 @@ impl LiveKitEncoder {
                         );
                     }
                     gst::MessageView::StateChanged(state_changed) => {
-                        // Log all state changes to understand what's happening
                         let src_name = state_changed.src()
                             .map(|s| s.path_string().to_string())
                             .unwrap_or_else(|| "unknown".to_string());
@@ -257,7 +256,6 @@ impl LiveKitEncoder {
         // Give pipeline a moment to initialize
         std::thread::sleep(std::time::Duration::from_millis(100));
         
-        // Check current state
         let (state_change, current, pending) = pipeline.state(gst::ClockTime::from_seconds(1));
         debug!("Pipeline state after initialization: current={:?}, pending={:?}, result={:?}", current, pending, state_change);
         
@@ -283,7 +281,6 @@ impl LiveKitEncoder {
                 expected_size, self.width, self.height, buffer_size);
         }
         
-        // Check pipeline state
         let state = self.pipeline.state(gst::ClockTime::from_seconds(0));
         if state.1 != gst::State::Playing {
             warn!("Pipeline not in playing state: {:?}", state.1);
