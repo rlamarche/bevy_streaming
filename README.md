@@ -30,7 +30,7 @@ The player can then play from his browser or any device compatible with WebRTC. 
 
 ## Prerequisites
 
-- Ubuntu 24.04 for up-to-date gstreamer (or you'll have to build it from source)
+### Linux (Ubuntu 24.04)
 
 Install the following libraries:
 
@@ -50,6 +50,14 @@ sudo apt-get install \
     libgstreamer-plugins-good1.0-dev \
     libgstreamer-plugins-bad1.0-dev \
     libasound2-dev
+```
+
+### macOS
+
+Install GStreamer and dependencies using Homebrew:
+
+```bash
+brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav libnice-gstreamer
 ```
 
 Upgrade Rust if needed (Rust edition 2024):
@@ -80,7 +88,25 @@ cargo run --example simple
 
 #### Prerequisites for LiveKit
 
-To use LiveKit streaming, you need the `livekitwebrtcsink` GStreamer element installed. Build and install gst-plugins-rs:
+To use LiveKit streaming, you need the `livekitwebrtcsink` GStreamer element installed.
+
+##### macOS
+
+After installing the Homebrew packages above, run:
+
+```bash
+./scripts/build-livekit-gstreamer-macos.sh
+```
+
+Then add this to your `~/.zshrc` or `~/.bash_profile`:
+
+```bash
+export GST_PLUGIN_PATH="$HOME/.local/lib/gstreamer-1.0"
+```
+
+##### Linux
+
+Build and install gst-plugins-rs:
 
 ```bash
 # Clone and build gst-plugins-rs with LiveKit support
@@ -95,6 +121,8 @@ sudo install -m 644 target/release/libgstrswebrtc.so \
 # Verify installation
 gst-inspect-1.0 livekitwebrtcsink
 ```
+
+_Note: If you run into any Bevy-related build errors, please see the [Bevy repository](https://github.com/bevyengine/bevy) for platform-specific setup instructions._
 
 #### Running with LiveKit Cloud
 
