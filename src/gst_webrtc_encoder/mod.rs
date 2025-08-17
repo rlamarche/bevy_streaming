@@ -9,7 +9,7 @@ use gstrswebrtc::{
 
 #[cfg(feature = "pixelstreaming")]
 use crate::pixelstreaming::signaller::UePsSignaller;
-use crate::{CongestionControl, SignallingServer, StreamerSettings};
+use crate::{CongestionControl, SignallingServer, StreamerSettings, encoder::StreamEncoder};
 
 #[derive(Debug, Display, Error)]
 #[display("Received error from {src}: {error} (debug: {debug:?})")]
@@ -38,6 +38,10 @@ impl Into<Signallable> for &SignallingServer {
                     signaller.set_property_from_str("streamer-id", streamer_id);
                 }
                 signaller.upcast()
+            }
+            #[cfg(feature = "livekit")]
+            SignallingServer::LiveKit { .. } => {
+                panic!("LiveKit signalling should use LiveKitEncoder instead of GstWebRtcEncoder")
             }
         }
     }
@@ -174,5 +178,15 @@ impl GstWebRtcEncoder {
     }
     pub fn finish(self: Box<Self>) {
         self.pipeline.set_state(gst::State::Null).unwrap();
+    }
+}
+
+impl StreamEncoder for GstWebRtcEncoder {
+    fn push_frame(&self, frame_data: &[u8]) -> Result<()> {
+        self.push_buffer(&frame_data.to_vec())
+    }
+
+    fn start(&self) -> Result<()> {
+        GstWebRtcEncoder::start(self)
     }
 }

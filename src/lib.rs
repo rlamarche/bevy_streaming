@@ -20,6 +20,9 @@ mod settings;
 pub mod gst_webrtc_encoder;
 #[cfg(feature = "pixelstreaming")]
 mod pixelstreaming;
+pub mod encoder;
+#[cfg(feature = "livekit")]
+pub mod livekit;
 
 #[derive(Component)]
 enum ControllerState {

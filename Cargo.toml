@@ -13,6 +13,10 @@ path = "src/lib.rs"
 name = "simple"
 required-features = ["pixelstreaming"]
 
+[[example]]
+name = "livekit"
+required-features = ["livekit"]
+
 [dependencies]
 bevy_app = { version = "0.16" }
 bevy_ecs = { version = "0.16" }
@@ -79,6 +83,7 @@ pixelstreaming = [
     "dep:tokio-stream",
     "dep:byteorder",
 ]
+livekit = []
 
 # Enable a small amount of optimization in the dev profile.
 [profile.dev]

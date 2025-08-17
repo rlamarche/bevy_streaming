@@ -5,11 +5,15 @@ use bevy_log::prelude::*;
 use bevy_render::{prelude::*, renderer::RenderDevice};
 use gst::prelude::*;
 use gstrswebrtc::webrtcsink;
+use std::sync::Arc;
 
 use crate::{
     ControllerState, StreamerSettings, capture::setup_render_target,
     gst_webrtc_encoder::GstWebRtcEncoder,
+    encoder::EncoderHandle,
 };
+#[cfg(feature = "livekit")]
+use crate::livekit::{LiveKitConfig, LiveKitEncoder};
 
 #[cfg(feature = "pixelstreaming")]
 use crate::pixelstreaming::{controller::PSControllerState, handler::PSMessageHandler};
@@ -23,25 +27,45 @@ pub struct StreamerHelper<'w, 's> {
 
 impl<'w, 's> StreamerHelper<'w, 's> {
     pub fn new_streamer_camera(&mut self, settings: StreamerSettings) -> impl Bundle {
-        let encoder = GstWebRtcEncoder::with_settings(settings.clone())
-            .expect("Unable to create gst encoder");
-        encoder.start().expect("Unable to start pipeline");
-
-        // Bind controller if enabled
-        let controller_state = if settings.enable_controller {
-            match settings.signalling_server {
-                crate::SignallingServer::GstWebRtc { .. } => {
-                    // TODO bind navigation events
-                    ControllerState::None
-                }
-
-                #[cfg(feature = "pixelstreaming")]
-                crate::SignallingServer::PixelStreaming { .. } => {
-                    create_pixelstreaming_controller(&encoder)
-                }
+        let (encoder, controller_state): (EncoderHandle, ControllerState) = match &settings.signalling_server {
+            #[cfg(feature = "livekit")]
+            crate::SignallingServer::LiveKit { url, api_key, api_secret, room_name, participant_identity, participant_name } => {
+                let config = LiveKitConfig::new(
+                    url.clone(),
+                    api_key.clone(),
+                    api_secret.clone(),
+                    room_name.clone(),
+                    participant_identity.clone(),
+                    participant_name.clone(),
+                    settings.width,
+                    settings.height
+                );
+                let encoder = LiveKitEncoder::new(config)
+                    .expect("Unable to create LiveKit encoder");
+                // LiveKit pipeline starts automatically in new()
+                (encoder as EncoderHandle, ControllerState::None)
             }
-        } else {
-            ControllerState::None
+            _ => {
+                let encoder = GstWebRtcEncoder::with_settings(settings.clone())
+                    .expect("Unable to create gst encoder");
+                encoder.start().expect("Unable to start pipeline");
+                
+                let controller_state = if settings.enable_controller {
+                    match &settings.signalling_server {
+                        crate::SignallingServer::GstWebRtc { .. } => {
+                            ControllerState::None
+                        }
+                        #[cfg(feature = "pixelstreaming")]
+                        crate::SignallingServer::PixelStreaming { .. } => {
+                            create_pixelstreaming_controller(&encoder)
+                        }
+                        _ => ControllerState::None,
+                    }
+                } else {
+                    ControllerState::None
+                };
+                (Arc::new(encoder) as EncoderHandle, controller_state)
+            }
         };
 
         let render_target = setup_render_target(
