@@ -27,7 +27,7 @@ bevy_log = { version = "0.16" }
 bevy_input = { version = "0.16" }
 bevy_picking = { version = "0.16" }
 bevy_math = { version = "0.16" }
-bevy_window = { version = "0.16" }
+bevy_window = { version = "0.16", optional = true }
 bevy_utils = { version = "0.16" }
 bevy_derive = { version = "0.16" }
 bevy_platform = { version = "0.16" }
@@ -82,6 +82,7 @@ pixelstreaming = [
     "dep:tokio-native-tls",
     "dep:tokio-stream",
     "dep:byteorder",
+    "dep:bevy_window",
 ]
 livekit = []
 

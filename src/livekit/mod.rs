@@ -244,22 +244,30 @@ impl LiveKitEncoder {
         info!("Setting pipeline to Playing state...");
         let state_result = pipeline.set_state(gst::State::Playing);
         match state_result {
-            Ok(gst::StateChangeSuccess::Success) => debug!("Pipeline state changed to Playing immediately"),
-            Ok(gst::StateChangeSuccess::Async) => debug!("Pipeline state change to Playing is async"),
-            Ok(gst::StateChangeSuccess::NoPreroll) => debug!("Pipeline state changed to Playing (no preroll)"),
+            Ok(gst::StateChangeSuccess::Success) => info!("Pipeline state changed to Playing immediately"),
+            Ok(gst::StateChangeSuccess::Async) => info!("Pipeline state change to Playing is async"),
+            Ok(gst::StateChangeSuccess::NoPreroll) => info!("Pipeline state changed to Playing (no preroll)"),
             Err(e) => {
                 error!("Failed to set pipeline to Playing: {:?}", e);
                 return Err(anyhow::anyhow!("Failed to set pipeline to playing state: {:?}", e));
             }
         }
         
-        // Give pipeline a moment to initialize
-        std::thread::sleep(std::time::Duration::from_millis(100));
+        // Wait for pipeline to actually reach Playing state
+        // info!("Waiting for pipeline to reach Playing state...");
+        // let timeout = gst::ClockTime::from_seconds(10);
+        // let (state_change, current, pending) = pipeline.get_state(timeout);
         
-        let (state_change, current, pending) = pipeline.state(gst::ClockTime::from_seconds(1));
-        debug!("Pipeline state after initialization: current={:?}, pending={:?}, result={:?}", current, pending, state_change);
+        // info!("Pipeline state after waiting: current={:?}, pending={:?}, result={:?}", current, pending, state_change);
         
-        info!("LiveKit pipeline started successfully");
+        // if current != gst::State::Playing {
+        //     warn!("Pipeline did not reach Playing state, current state: {:?}", current);
+        //     // Don't fail here, as the pipeline might still work
+        // } else {
+        //     info!("LiveKit pipeline successfully reached Playing state");
+        // }
+        
+        info!("LiveKit pipeline initialization complete");
         
         Ok(Arc::new(Self {
             pipeline,

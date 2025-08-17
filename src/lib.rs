@@ -6,6 +6,7 @@ use bevy_input::{
 };
 use bevy_picking::PickSet;
 use bevy_render::{Render, RenderApp, RenderSet, prelude::*, render_graph::RenderGraph};
+#[cfg(feature = "pixelstreaming")]
 use bevy_window::{PrimaryWindow, WindowEvent, prelude::*};
 
 use capture::{
@@ -71,10 +72,13 @@ impl Plugin for StreamerPlugin {
                 ),
             );
 
-        app.add_systems(
-            PreUpdate,
-            (handle_controller_messages.in_set(PickSet::Input),),
-        );
+        #[cfg(feature = "pixelstreaming")]
+        {
+            app.add_systems(
+                PreUpdate,
+                (handle_controller_messages.in_set(PickSet::Input),),
+            );
+        }
         app.add_systems(PostUpdate, handle_controllers);
     }
 }
@@ -101,6 +105,7 @@ fn handle_controllers(mut controllers: Query<&mut ControllerState>) {
 }
 
 /// This system process controller's messages
+#[cfg(feature = "pixelstreaming")]
 fn handle_controller_messages(
     mut controllers: Query<(&Camera, &mut ControllerState)>,
     windows: Query<(Entity, &Window), With<PrimaryWindow>>,
