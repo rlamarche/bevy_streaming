@@ -4,7 +4,7 @@ use bevy::{
     render::RenderPlugin, 
     winit::WinitPlugin,
 };
-use bevy_streaming::{StreamerHelper, StreamerSettings, SignallingServer};
+use bevy_streaming::{livekit::{LiveKitEncoder, LiveKitSettings}, SignallingServer, StreamerCameraBuilder, StreamerHelper};
 use std::time::Duration;
 
 fn main() {
@@ -36,7 +36,7 @@ fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    mut helper: StreamerHelper,
+    mut helper: StreamerHelper<LiveKitEncoder>,
 ) {
     commands.spawn((
         Mesh3d(meshes.add(Plane3d::default().mesh().size(10.0, 10.0))),
@@ -76,25 +76,21 @@ fn setup(
     ));
     
     // Player camera with LiveKit streaming
-    let livekit_settings = StreamerSettings {
-        signalling_server: SignallingServer::LiveKit {
-            url: std::env::var("LIVEKIT_URL")
-                .expect("LIVEKIT_URL must be set"),
-            api_key: std::env::var("LIVEKIT_API_KEY")
-                .expect("LIVEKIT_API_KEY must be set"),
-            api_secret: std::env::var("LIVEKIT_API_SECRET")
-                .expect("LIVEKIT_API_SECRET must be set"),
-            room_name: std::env::var("LIVEKIT_ROOM_NAME")
-                .unwrap_or_else(|_| "bevy_streaming_demo".to_string()),
-            participant_identity: std::env::var("LIVEKIT_PARTICIPANT_IDENTITY")
-                .unwrap_or_else(|_| "bevy_player_camera".to_string()),
-            participant_name: std::env::var("LIVEKIT_PARTICIPANT_NAME")
-                .unwrap_or_else(|_| "Player Camera".to_string()),
-        },
+    let livekit_settings = LiveKitSettings {
+        url: std::env::var("LIVEKIT_URL")
+            .expect("LIVEKIT_URL must be set"),
+        api_key: std::env::var("LIVEKIT_API_KEY")
+            .expect("LIVEKIT_API_KEY must be set"),
+        api_secret: std::env::var("LIVEKIT_API_SECRET")
+            .expect("LIVEKIT_API_SECRET must be set"),
+        room_name: std::env::var("LIVEKIT_ROOM_NAME")
+            .unwrap_or_else(|_| "bevy_streaming_demo".to_string()),
+        participant_identity: std::env::var("LIVEKIT_PARTICIPANT_IDENTITY")
+            .unwrap_or_else(|_| "bevy_player_camera".to_string()),
+        participant_name: std::env::var("LIVEKIT_PARTICIPANT_NAME")
+            .unwrap_or_else(|_| "Player Camera".to_string()),
         width: 1280,
         height: 720,
-        video_caps: Some("video/x-h264".to_string()),
-        congestion_control: None,
         enable_controller: false,
     };
     
@@ -105,23 +101,19 @@ fn setup(
     ));
     
     // Spectator camera with LiveKit streaming (different participant)
-    let spectator_settings = StreamerSettings {
-        signalling_server: SignallingServer::LiveKit {
-            url: std::env::var("LIVEKIT_URL")
-                .expect("LIVEKIT_URL must be set"),
-            api_key: std::env::var("LIVEKIT_API_KEY")
-                .expect("LIVEKIT_API_KEY must be set"),
-            api_secret: std::env::var("LIVEKIT_API_SECRET")
-                .expect("LIVEKIT_API_SECRET must be set"),
-            room_name: std::env::var("LIVEKIT_ROOM_NAME")
-                .unwrap_or_else(|_| "bevy_streaming_demo".to_string()),
-            participant_identity: "bevy_spectator_camera".to_string(),
-            participant_name: "Spectator Camera".to_string(),
-        },
+    let spectator_settings = LiveKitSettings {
+        url: std::env::var("LIVEKIT_URL")
+            .expect("LIVEKIT_URL must be set"),
+        api_key: std::env::var("LIVEKIT_API_KEY")
+            .expect("LIVEKIT_API_KEY must be set"),
+        api_secret: std::env::var("LIVEKIT_API_SECRET")
+            .expect("LIVEKIT_API_SECRET must be set"),
+        room_name: std::env::var("LIVEKIT_ROOM_NAME")
+            .unwrap_or_else(|_| "bevy_streaming_demo".to_string()),
+        participant_identity: "bevy_spectator_camera".to_string(),
+        participant_name: "Spectator Camera".to_string(),
         width: 1280,
         height: 720,
-        video_caps: Some("video/x-h264".to_string()),
-        congestion_control: None,
         enable_controller: false,
     };
     

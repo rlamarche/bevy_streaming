@@ -5,74 +5,79 @@ use bevy_log::prelude::*;
 use bevy_render::{prelude::*, renderer::RenderDevice};
 use gst::prelude::*;
 use gstrswebrtc::webrtcsink;
-use std::sync::Arc;
+use std::{marker::PhantomData, sync::Arc};
 
 use crate::{
-    ControllerState, StreamerSettings, capture::setup_render_target,
-    gst_webrtc_encoder::GstWebRtcEncoder,
-    encoder::EncoderHandle,
+    capture::setup_render_target, encoder::StreamEncoder, gst_webrtc_encoder::GstWebRtcEncoder, ControllerState, GstWebRtcSettings
 };
 #[cfg(feature = "livekit")]
-use crate::livekit::{LiveKitConfig, LiveKitEncoder};
+use crate::livekit::{LiveKitSettings, LiveKitEncoder};
 
 #[cfg(feature = "pixelstreaming")]
 use crate::pixelstreaming::{controller::PSControllerState, handler::PSMessageHandler};
 
 #[derive(SystemParam)]
-pub struct StreamerHelper<'w, 's> {
+pub struct StreamerHelper<'w, 's, E: StreamEncoder + 'static> {
     commands: Commands<'w, 's>,
     images: ResMut<'w, Assets<Image>>,
     render_device: Res<'w, RenderDevice>,
+    _phantom_encoder: PhantomData<E>
 }
 
-impl<'w, 's> StreamerHelper<'w, 's> {
-    pub fn new_streamer_camera(&mut self, settings: StreamerSettings) -> impl Bundle {
-        let (encoder, controller_state): (EncoderHandle, ControllerState) = match &settings.signalling_server {
-            #[cfg(feature = "livekit")]
-            crate::SignallingServer::LiveKit { url, api_key, api_secret, room_name, participant_identity, participant_name } => {
-                let config = LiveKitConfig::new(
-                    url.clone(),
-                    api_key.clone(),
-                    api_secret.clone(),
-                    room_name.clone(),
-                    participant_identity.clone(),
-                    participant_name.clone(),
-                    settings.width,
-                    settings.height
-                );
-                let encoder = LiveKitEncoder::new(config)
-                    .expect("Unable to create LiveKit encoder");
-                // LiveKit pipeline starts automatically in new()
-                (encoder as EncoderHandle, ControllerState::None)
+pub trait StreamerCameraBuilder<E: StreamEncoder, S> {
+    fn new_streamer_camera(&mut self, settings: S) -> impl Bundle;
+}
+
+impl<'w, 's> StreamerCameraBuilder<GstWebRtcEncoder, GstWebRtcSettings> 
+for StreamerHelper<'w, 's, GstWebRtcEncoder>
+{
+    fn new_streamer_camera(&mut self, settings: GstWebRtcSettings) -> impl Bundle {
+        let encoder = GstWebRtcEncoder::with_settings(settings.clone())
+            .expect("Unable to create gst encoder");
+        encoder.start().expect("Unable to start pipeline");
+        
+        let controller_state = if settings.enable_controller {
+            match &settings.signalling_server {
+                #[cfg(feature = "pixelstreaming")]
+                crate::SignallingServer::PixelStreaming { .. } => {
+                    create_pixelstreaming_controller(&encoder)
+                }
+                _ => ControllerState::None,
             }
-            _ => {
-                let encoder = GstWebRtcEncoder::with_settings(settings.clone())
-                    .expect("Unable to create gst encoder");
-                encoder.start().expect("Unable to start pipeline");
-                
-                let controller_state = if settings.enable_controller {
-                    match &settings.signalling_server {
-                        crate::SignallingServer::GstWebRtc { .. } => {
-                            ControllerState::None
-                        }
-                        #[cfg(feature = "pixelstreaming")]
-                        crate::SignallingServer::PixelStreaming { .. } => {
-                            create_pixelstreaming_controller(&encoder)
-                        }
-                        _ => ControllerState::None,
-                    }
-                } else {
-                    ControllerState::None
-                };
-                (Arc::new(encoder) as EncoderHandle, controller_state)
-            }
+        } else {
+            ControllerState::None
         };
 
         let render_target = setup_render_target(
             &mut self.commands,
             &mut self.images,
             &self.render_device,
-            // &self.render_instance,
+            settings.width,
+            settings.height,
+            Arc::new(encoder),
+        );
+
+        let camera = Camera {
+            target: render_target,
+            ..Default::default()
+        };
+
+        (camera, controller_state)
+    }
+}
+
+#[cfg(feature = "livekit")]
+impl<'w, 's> StreamerCameraBuilder<LiveKitEncoder, LiveKitSettings> 
+for StreamerHelper<'w, 's, LiveKitEncoder>
+{
+    fn new_streamer_camera(&mut self, settings: LiveKitSettings) -> impl Bundle {
+        let encoder = LiveKitEncoder::new(settings.clone())
+            .expect("Unable to create LiveKit encoder");
+
+        let render_target = setup_render_target(
+            &mut self.commands,
+            &mut self.images,
+            &self.render_device,
             settings.width,
             settings.height,
             encoder,
@@ -83,7 +88,7 @@ impl<'w, 's> StreamerHelper<'w, 's> {
             ..Default::default()
         };
 
-        (camera, controller_state)
+        (camera, ControllerState::None)
     }
 }
 

@@ -3,7 +3,7 @@ use bevy::{
     winit::WinitPlugin,
 };
 use bevy_streaming::{
-    CongestionControl, SignallingServer, StreamerHelper, StreamerPlugin, StreamerSettings,
+    gst_webrtc_encoder::GstWebRtcEncoder, CongestionControl, GstWebRtcSettings, SignallingServer, StreamerCameraBuilder, StreamerHelper, StreamerPlugin
 };
 use camera_controller::{CameraController, CameraControllerPlugin};
 use cursor::CursorPlugin;
@@ -55,13 +55,13 @@ struct PlayerCamera;
 #[derive(Component)]
 struct SpectatorCamera;
 
-fn setup_cameras(mut commands: Commands, mut streamer: StreamerHelper) {
+fn setup_cameras(mut commands: Commands, mut streamer: StreamerHelper<GstWebRtcEncoder>) {
     // camera
     let main_camera = commands
         .spawn((
             Camera3d::default(),
             Transform::from_xyz(-2.5, 4.5, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
-            streamer.new_streamer_camera(StreamerSettings {
+            streamer.new_streamer_camera(GstWebRtcSettings {
                 signalling_server: SignallingServer::PixelStreaming {
                     uri: "ws://localhost:8888".to_string(),
                     streamer_id: Some("player".to_string()),
@@ -84,7 +84,7 @@ fn setup_cameras(mut commands: Commands, mut streamer: StreamerHelper) {
     commands.spawn((
         Camera3d::default(),
         Transform::from_xyz(2.5, 12.0, 9.0).looking_at(Vec3::ZERO, Vec3::Y),
-        streamer.new_streamer_camera(StreamerSettings {
+        streamer.new_streamer_camera(GstWebRtcSettings {
             signalling_server: SignallingServer::PixelStreaming {
                 uri: "ws://localhost:8888".to_string(),
                 streamer_id: Some("spectator".to_string()),

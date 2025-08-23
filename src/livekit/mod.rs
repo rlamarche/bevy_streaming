@@ -8,7 +8,7 @@ use std::sync::Arc;
 use crate::encoder::StreamEncoder;
 
 #[derive(Clone)]
-pub struct LiveKitConfig {
+pub struct LiveKitSettings {
     pub url: String,
     pub api_key: String,
     pub api_secret: String,
@@ -17,9 +17,11 @@ pub struct LiveKitConfig {
     pub participant_name: String,
     pub width: u32,
     pub height: u32,
+    // TODO(victor): implement in next pr
+    pub enable_controller: bool,
 }
 
-impl LiveKitConfig {
+impl LiveKitSettings {
     pub fn from_env(width: u32, height: u32) -> Result<Self> {
         let livekit_url = std::env::var("LIVEKIT_URL")
             .context("LIVEKIT_URL environment variable must be set")?;
@@ -46,29 +48,8 @@ impl LiveKitConfig {
                 .unwrap_or_else(|_| "Bevy Streaming".to_string()),
             width,
             height,
+            enable_controller: false,
         })
-    }
-
-    pub fn new(
-        url: String,
-        api_key: String,
-        api_secret: String,
-        room_name: String,
-        participant_identity: String,
-        participant_name: String,
-        width: u32,
-        height: u32,
-    ) -> Self {
-        Self {
-            url,
-            api_key,
-            api_secret,
-            room_name,
-            participant_identity,
-            participant_name,
-            width,
-            height,
-        }
     }
 }
 
@@ -81,20 +62,20 @@ pub struct LiveKitEncoder {
 }
 
 impl LiveKitEncoder {
-    pub fn new(config: LiveKitConfig) -> Result<Arc<Self>> {
+    pub fn new(settings: LiveKitSettings) -> Result<Arc<Self>> {
         // Initialize GStreamer if not already initialized
         gst::init()?;
         
         info!("Creating LiveKit encoder with GStreamer...");
-        info!("LiveKit URL: {}", config.url);
-        info!("Room: {}", config.room_name);
-        info!("Participant: {} ({})", config.participant_name, config.participant_identity);
+        info!("LiveKit URL: {}", settings.url);
+        info!("Room: {}", settings.room_name);
+        info!("Participant: {} ({})", settings.participant_name, settings.participant_identity);
         
         // Calculate appropriate bitrate based on resolution
         // Roughly 0.1 bits per pixel for 60fps as baseline
-        let pixels = config.width * config.height;
+        let pixels = settings.width * settings.height;
         let bitrate = ((pixels as f32 * 0.1 * 60.0 / 1000.0) as u32).max(1000).min(10000);
-        info!("Using bitrate: {} kbps for {}x{} resolution", bitrate, config.width, config.height);
+        info!("Using bitrate: {} kbps for {}x{} resolution", bitrate, settings.width, settings.height);
         
         let pipeline_str = format!(
             "appsrc name=video_src format=time is-live=true do-timestamp=true ! \
@@ -114,15 +95,15 @@ impl LiveKitEncoder {
                 signaller::identity={} \
                 signaller::participant-name=\"{}\" \
                 video-caps=\"video/x-h264\"",
-            config.width,
-            config.height,
+            settings.width,
+            settings.height,
             bitrate,
-            config.url,
-            config.api_key,
-            config.api_secret,
-            config.room_name,
-            config.participant_identity,
-            config.participant_name
+            settings.url,
+            settings.api_key,
+            settings.api_secret,
+            settings.room_name,
+            settings.participant_identity,
+            settings.participant_name
         );
         
         info!("Creating LiveKit pipeline with command:");
@@ -158,7 +139,7 @@ impl LiveKitEncoder {
         appsrc.set_property("is-live", true);
         appsrc.set_property("do-timestamp", true);
         
-        let video_info = VideoInfo::builder(VideoFormat::Rgba, config.width, config.height)
+        let video_info = VideoInfo::builder(VideoFormat::Rgba, settings.width, settings.height)
             .fps(gst::Fraction::new(60, 1))
             .build()
             .context("Failed to create video info")?;
@@ -272,8 +253,8 @@ impl LiveKitEncoder {
         Ok(Arc::new(Self {
             pipeline,
             appsrc,
-            width: config.width,
-            height: config.height,
+            width: settings.width,
+            height: settings.height,
         }))
     }
 

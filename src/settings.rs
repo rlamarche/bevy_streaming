@@ -9,15 +9,6 @@ pub enum SignallingServer {
         uri: String,
         streamer_id: Option<String>,
     },
-    #[cfg(feature = "livekit")]
-    LiveKit {
-        url: String,
-        api_key: String,
-        api_secret: String,
-        room_name: String,
-        participant_identity: String,
-        participant_name: String,
-    },
 }
 
 impl AsRef<Self> for SignallingServer {
@@ -35,7 +26,7 @@ pub enum CongestionControl {
 }
 
 #[derive(Clone)]
-pub struct StreamerSettings {
+pub struct GstWebRtcSettings {
     pub signalling_server: SignallingServer,
     pub width: u32,
     pub height: u32,

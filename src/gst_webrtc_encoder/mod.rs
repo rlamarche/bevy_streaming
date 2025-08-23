@@ -9,7 +9,7 @@ use gstrswebrtc::{
 
 #[cfg(feature = "pixelstreaming")]
 use crate::pixelstreaming::signaller::UePsSignaller;
-use crate::{CongestionControl, SignallingServer, StreamerSettings, encoder::StreamEncoder};
+use crate::{CongestionControl, SignallingServer, GstWebRtcSettings, encoder::StreamEncoder};
 
 #[derive(Debug, Display, Error)]
 #[display("Received error from {src}: {error} (debug: {debug:?})")]
@@ -39,10 +39,6 @@ impl Into<Signallable> for &SignallingServer {
                 }
                 signaller.upcast()
             }
-            #[cfg(feature = "livekit")]
-            SignallingServer::LiveKit { .. } => {
-                panic!("LiveKit signalling should use LiveKitEncoder instead of GstWebRtcEncoder")
-            }
         }
     }
 }
@@ -50,14 +46,14 @@ impl Into<Signallable> for &SignallingServer {
 #[derive(Clone)]
 pub struct GstWebRtcEncoder {
     #[allow(dead_code)]
-    settings: StreamerSettings,
+    settings: GstWebRtcSettings,
     pipeline: gst::Pipeline,
     pub appsrc: gst_app::AppSrc,
     pub webrtcsink: BaseWebRTCSink,
 }
 
 impl GstWebRtcEncoder {
-    pub fn with_settings(settings: StreamerSettings) -> Result<Self> {
+    pub fn with_settings(settings: GstWebRtcSettings) -> Result<Self> {
         gst::init()?;
 
         let pipeline = gst::Pipeline::default();
