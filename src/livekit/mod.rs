@@ -135,9 +135,7 @@ impl LiveKitEncoder {
             .downcast::<gst_app::AppSrc>()
             .map_err(|_| anyhow::anyhow!("Not an appsrc"))?;
         
-        appsrc.set_property("format", gst::Format::Time);
         appsrc.set_property("is-live", true);
-        appsrc.set_property("do-timestamp", true);
         
         let video_info = VideoInfo::builder(VideoFormat::Rgba, settings.width, settings.height)
             .fps(gst::Fraction::new(60, 1))
@@ -148,7 +146,7 @@ impl LiveKitEncoder {
             .context("Failed to create caps from video info")?;
         appsrc.set_caps(Some(&caps));
         
-        let bus = pipeline.bus().ok_or_else(|| anyhow::anyhow!("Pipeline has no bus"))?;
+        let _bus = pipeline.bus().ok_or_else(|| anyhow::anyhow!("Pipeline has no bus"))?;
         
         // Spawn a thread to monitor the bus for messages
         let pipeline_weak = pipeline.downgrade();

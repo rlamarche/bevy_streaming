@@ -4,7 +4,7 @@ use bevy::{
     render::RenderPlugin, 
     winit::WinitPlugin,
 };
-use bevy_streaming::{livekit::{LiveKitEncoder, LiveKitSettings}, SignallingServer, StreamerCameraBuilder, StreamerHelper};
+use bevy_streaming::{livekit::{LiveKitEncoder, LiveKitSettings}, StreamerCameraBuilder, StreamerHelper};
 use std::time::Duration;
 
 fn main() {

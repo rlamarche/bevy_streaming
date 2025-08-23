@@ -143,7 +143,13 @@ export LIVEKIT_ROOM_NAME="bevy_streaming_demo"
 cargo run --example livekit --features livekit
 ```
 
-5. Connect using the LiveKit meet app at https://meet.livekit.io/
+5. Generate a viewer token and connect:
+
+```bash
+uv run ./scripts/generate-viewer-token.py
+```
+
+This will output a token and instructions to connect using the LiveKit meet app at https://meet.livekit.io/
 
 ![LiveKit Demo](livekit_demo.png)
 
