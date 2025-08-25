@@ -72,6 +72,7 @@ bevy = { version = "0.16" }
 
 [features]
 default = ["pixelstreaming"]
+cuda = []
 pixelstreaming = [
     "dep:url",
     "dep:async-tungstenite",

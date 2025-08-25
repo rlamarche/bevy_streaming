@@ -77,6 +77,13 @@ impl LiveKitEncoder {
         let bitrate = ((pixels as f32 * 0.1 * 60.0 / 1000.0) as u32).max(1000).min(10000);
         info!("Using bitrate: {} kbps for {}x{} resolution", bitrate, settings.width, settings.height);
         
+        // Select encoder based on cuda feature flag
+        let encoder = if cfg!(feature = "cuda") {
+            "nvh264enc preset=low-latency-hq bitrate=".to_string() + &bitrate.to_string() + " gop-size=60"
+        } else {
+            format!("x264enc tune=zerolatency speed-preset=ultrafast bitrate={} key-int-max=60", bitrate)
+        };
+
         let pipeline_str = format!(
             "appsrc name=video_src format=time is-live=true do-timestamp=true ! \
             video/x-raw,format=RGBA,width={},height={},framerate=60/1 ! \
@@ -84,7 +91,7 @@ impl LiveKitEncoder {
             videoconvert ! \
             video/x-raw,format=I420 ! \
             queue ! \
-            x264enc tune=zerolatency speed-preset=ultrafast bitrate={} key-int-max=60 ! \
+            {} ! \
             video/x-h264,profile=baseline ! \
             queue ! \
             livekitwebrtcsink name=livekit \
@@ -97,7 +104,7 @@ impl LiveKitEncoder {
                 video-caps=\"video/x-h264\"",
             settings.width,
             settings.height,
-            bitrate,
+            encoder,
             settings.url,
             settings.api_key,
             settings.api_secret,
