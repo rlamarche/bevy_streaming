@@ -26,7 +26,7 @@ pub enum CongestionControl {
 }
 
 #[derive(Clone)]
-pub struct StreamerSettings {
+pub struct GstWebRtcSettings {
     pub signalling_server: SignallingServer,
     pub width: u32,
     pub height: u32,

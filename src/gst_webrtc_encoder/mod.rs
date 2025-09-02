@@ -9,7 +9,7 @@ use gstrswebrtc::{
 
 #[cfg(feature = "pixelstreaming")]
 use crate::pixelstreaming::signaller::UePsSignaller;
-use crate::{CongestionControl, SignallingServer, StreamerSettings};
+use crate::{CongestionControl, SignallingServer, GstWebRtcSettings, encoder::StreamEncoder};
 
 #[derive(Debug, Display, Error)]
 #[display("Received error from {src}: {error} (debug: {debug:?})")]
@@ -46,14 +46,14 @@ impl Into<Signallable> for &SignallingServer {
 #[derive(Clone)]
 pub struct GstWebRtcEncoder {
     #[allow(dead_code)]
-    settings: StreamerSettings,
+    settings: GstWebRtcSettings,
     pipeline: gst::Pipeline,
     pub appsrc: gst_app::AppSrc,
     pub webrtcsink: BaseWebRTCSink,
 }
 
 impl GstWebRtcEncoder {
-    pub fn with_settings(settings: StreamerSettings) -> Result<Self> {
+    pub fn with_settings(settings: GstWebRtcSettings) -> Result<Self> {
         gst::init()?;
 
         let pipeline = gst::Pipeline::default();
@@ -174,5 +174,15 @@ impl GstWebRtcEncoder {
     }
     pub fn finish(self: Box<Self>) {
         self.pipeline.set_state(gst::State::Null).unwrap();
+    }
+}
+
+impl StreamEncoder for GstWebRtcEncoder {
+    fn push_frame(&self, frame_data: &[u8]) -> Result<()> {
+        self.push_buffer(&frame_data.to_vec())
+    }
+
+    fn start(&self) -> Result<()> {
+        GstWebRtcEncoder::start(self)
     }
 }

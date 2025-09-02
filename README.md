@@ -19,10 +19,10 @@ The player can then play from his browser or any device compatible with WebRTC. 
 - Multiple signalling server options:
   - GstWebRTC
   - PixelStreaming
+  - LiveKit (WebRTC infrastructure platform)
   - Soon: (supported by GStreamer natively)
     - Amazon Kinesis
     - Janus
-    - livekit
     - WHIP
 - Implementation of Unreal's Pixel Streaming signalling server protocol to send video and receive mouse/keyboard controls
 - Easy configuration of cameras using an helper
@@ -30,7 +30,7 @@ The player can then play from his browser or any device compatible with WebRTC. 
 
 ## Prerequisites
 
-- Ubuntu 24.04 for up-to-date gstreamer (or you'll have to build it from source)
+### Linux (Ubuntu 24.04)
 
 Install the following libraries:
 
@@ -52,13 +52,23 @@ sudo apt-get install \
     libasound2-dev
 ```
 
+### macOS
+
+Install GStreamer and dependencies using Homebrew:
+
+```bash
+brew install gstreamer gst-plugins-base gst-plugins-good gst-plugins-bad gst-plugins-ugly gst-libav libnice-gstreamer
+```
+
 Upgrade Rust if needed (Rust edition 2024):
 
 ```bash
 rustup update stable
 ```
 
-## Running the example
+## Running the examples
+
+### PixelStreaming Example
 
 First, start a PixelStreaming signalling server with the following command:
 
@@ -68,13 +78,80 @@ docker run --rm -t -i --network=host pixelstreamingunofficial/pixel-streaming-si
 
 _Note: 5.5 version has a default feature enabled that makes the WebRTC connection fail on some versions of Chrome._
 
-### Run the example from your computer
-
 Launch the example:
 
 ```bash
 cargo run --example simple
 ```
+
+### LiveKit Example
+
+#### Prerequisites for LiveKit
+
+To use LiveKit streaming, you need the `livekitwebrtcsink` GStreamer element installed.
+
+##### macOS
+
+After installing the Homebrew packages above, run:
+
+```bash
+./scripts/build-livekit-gstreamer-macos.sh
+```
+
+Then add this to your `~/.zshrc` or `~/.bash_profile`:
+
+```bash
+export GST_PLUGIN_PATH="$HOME/.local/lib/gstreamer-1.0"
+```
+
+##### Linux
+
+Build and install gst-plugins-rs:
+
+```bash
+# Clone and build gst-plugins-rs with LiveKit support
+git clone https://gitlab.freedesktop.org/gstreamer/gst-plugins-rs.git
+cd gst-plugins-rs
+cargo build --release -p gst-plugin-webrtc --features livekit
+
+# Install the plugin
+sudo install -m 644 target/release/libgstrswebrtc.so \
+  $(pkg-config --variable=pluginsdir gstreamer-1.0)/
+
+# Verify installation
+gst-inspect-1.0 livekitwebrtcsink
+```
+
+_Note: If you run into any Bevy-related build errors, please see the [Bevy repository](https://github.com/bevyengine/bevy) for platform-specific setup instructions._
+
+#### Running with LiveKit Cloud
+
+1. Sign up for a free account at https://livekit.io/cloud
+2. Create a new project and get your API credentials
+3. Set environment variables:
+
+```bash
+export LIVEKIT_URL="wss://your-project.livekit.cloud"
+export LIVEKIT_API_KEY="your-api-key"
+export LIVEKIT_API_SECRET="your-api-secret"
+export LIVEKIT_ROOM_NAME="bevy_streaming_demo"
+```
+
+4. Run the LiveKit example:
+
+```bash
+cargo run --example livekit --features livekit
+```
+
+5. Generate a viewer token and connect:
+
+```bash
+uv run ./scripts/generate-viewer-token.py
+```
+
+This will output a token and instructions to connect using the LiveKit meet app at https://meet.livekit.io/
+
+![LiveKit Demo](livekit_demo.png)
 
 ### Build the headless Docker image
 

@@ -18,7 +18,7 @@ use std::sync::{
     atomic::{AtomicBool, AtomicUsize, Ordering},
 };
 
-use crate::gst_webrtc_encoder::GstWebRtcEncoder;
+use crate::encoder::EncoderHandle;
 pub mod driver;
 
 /// `Captures` aggregator in `RenderWorld`
@@ -45,14 +45,14 @@ pub struct Capture {
 
     enabled: Arc<AtomicBool>,
     src_image: Handle<Image>,
-    encoder: Arc<GstWebRtcEncoder>,
+    encoder: EncoderHandle,
 }
 
 pub struct SendBufferJob {
     // slice: BufferSlice<'static>,
     buffer: Buffer,
     // len: usize,
-    encoder: Arc<GstWebRtcEncoder>,
+    encoder: EncoderHandle,
     // in_use: Arc<AtomicBool>,
     capture_idx: usize,
     buffer_idx: usize,
@@ -80,7 +80,7 @@ impl Capture {
         src_image: Handle<Image>,
         size: Extent3d,
         render_device: &RenderDevice,
-        encoder: GstWebRtcEncoder,
+        encoder: EncoderHandle,
     ) -> Self {
         let padded_bytes_per_row =
             RenderDevice::align_copy_bytes_per_row((size.width) as usize) * 4;
@@ -106,7 +106,7 @@ impl Capture {
             skip: Arc::new(AtomicBool::new(false)),
             enabled: Arc::new(AtomicBool::new(true)),
             src_image,
-            encoder: Arc::new(encoder),
+            encoder,
         }
     }
 
@@ -123,7 +123,7 @@ pub fn setup_render_target(
     // render_instance: &Res<RenderInstance>,
     width: u32,
     height: u32,
-    encoder: GstWebRtcEncoder,
+    encoder: EncoderHandle,
 ) -> RenderTarget {
     let size = Extent3d {
         width,
@@ -164,7 +164,8 @@ pub fn spawn_worker() -> (Sender<SendBufferJob>, Receiver<ReleaseSignal>) {
             let slice = job.buffer.slice(..);
             let data = slice.get_mapped_range().to_vec();
 
-            let _ = job.encoder.push_buffer(&data);
+
+            let _ = job.encoder.push_frame(&data);
 
             if let Err(e) = tx_release.send(ReleaseSignal {
                 capture_idx: job.capture_idx,
