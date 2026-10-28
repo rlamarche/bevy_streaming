@@ -9,7 +9,7 @@ use gstrswebrtc::{
 
 #[cfg(feature = "pixelstreaming")]
 use crate::pixelstreaming::signaller::UePsSignaller;
-use crate::{CongestionControl, SignallingServer, GstWebRtcSettings, encoder::StreamEncoder};
+use crate::{CongestionControl, GstWebRtcSettings, SignallingServer, encoder::StreamEncoder};
 
 #[derive(Debug, Display, Error)]
 #[display("Received error from {src}: {error} (debug: {debug:?})")]
@@ -65,6 +65,7 @@ impl GstWebRtcEncoder {
             settings.width,
             settings.height,
         )
+        .fps(gst::Fraction::new(60, 1))
         .build()
         .expect("Failed to create video info");
 
@@ -73,9 +74,9 @@ impl GstWebRtcEncoder {
             .do_timestamp(true)
             .is_live(true)
             .caps(&video_info.to_caps().unwrap())
-            .format(gst::Format::Bytes)
+            .format(gst::Format::Time)
             // Allocate space for 1 buffer
-            .max_bytes((settings.width * settings.height * 4).into())
+            .max_buffers(1)
             .build();
 
         // let queue = gst::ElementFactory::make("queue").build()?;
